@@ -21,9 +21,11 @@ import {
   buildExplanationPrompt,
 } from './prompt';
 import { validateIRDocument } from './validator';
+import path from 'path';
+import dotenv from 'dotenv';
 
-dotenv.config();
-
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+console.log('API KEY:', process.env.OPENAI_API_KEY?.slice(0, 20) + '...')
 // =============================================================================
 // PROVIDER FACTORY
 // Add new providers here. Switch via AI_PROVIDER env var.
