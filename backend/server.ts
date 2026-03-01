@@ -22,10 +22,20 @@ import {
 } from './prompt';
 import { validateIRDocument } from './validator';
 import path from 'path';
-import dotenv from 'dotenv';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-console.log('API KEY:', process.env.OPENAI_API_KEY?.slice(0, 20) + '...')
+// =============================================================================
+// JSON EXTRACTION
+// LLMs sometimes wrap JSON in markdown code blocks — strip them before parsing.
+// =============================================================================
+
+function extractJSON(text: string): string {
+  const trimmed = text.trim();
+  // Strip ```json ... ``` or ``` ... ``` wrappers
+  const match = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+  return match ? match[1].trim() : trimmed;
+}
+
 // =============================================================================
 // PROVIDER FACTORY
 // Add new providers here. Switch via AI_PROVIDER env var.
@@ -127,7 +137,7 @@ app.post('/api/generate', async (req, res) => {
 
     let mode: 'animation' | 'explanation' = 'animation';
     try {
-      const parsed = JSON.parse(classifyResponse.text);
+      const parsed = JSON.parse(extractJSON(classifyResponse.text));
       mode = parsed.mode === 'explanation' ? 'explanation' : 'animation';
     } catch {
       // Default to animation if classification fails
@@ -148,7 +158,7 @@ app.post('/api/generate', async (req, res) => {
       // Parse JSON
       let rawDocument: unknown;
       try {
-        rawDocument = JSON.parse(irResponse.text);
+        rawDocument = JSON.parse(extractJSON(irResponse.text));
       } catch {
         console.error('[Generate] Failed to parse AI response as JSON');
         console.error('[Generate] Raw response:', irResponse.text.slice(0, 500));
@@ -165,7 +175,7 @@ app.post('/api/generate', async (req, res) => {
         ]);
 
         try {
-          rawDocument = JSON.parse(retryResponse.text);
+          rawDocument = JSON.parse(extractJSON(retryResponse.text));
         } catch {
           return res.status(500).json({
             mode: 'error',

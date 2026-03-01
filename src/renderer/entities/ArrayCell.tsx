@@ -1,25 +1,24 @@
 /**
  * algo.viz — ArrayCell Entity Renderer
- * ======================================
- * Renders a single ARRAY_CELL entity as an SVG rectangle with value and index.
- * CSS transitions handle smooth state changes between steps.
+ * Tokyo Night palette. Scale + lift on highlight. No glow filters.
  */
 
 import type { ArrayCellEntity } from '../../ir/ir.types';
 import type { PixelPosition } from '../layout';
 import { CELL_WIDTH, CELL_HEIGHT } from '../layout';
 
-const COLORS = {
-  default:     { fill: '#1e1e2e', stroke: '#44475a',  text: '#cdd6f4', index: '#6272a4' },
-  highlighted: { fill: '#2a2a4a', stroke: '#f1fa8c',  text: '#f1fa8c', index: '#6272a4' },
-  dimmed:      { fill: '#12121a', stroke: '#2a2a3d',  text: '#44475a', index: '#2a2a3d' },
-};
+const TRANSITION  = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+const TRANS_SCALE = 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)';
+const VALUE_FONT  = 17;
+const INDEX_FONT  = 10;
+const INDEX_Y     = 20;
+const R           = 7;
 
-const CORNER_RADIUS = 6;
-const VALUE_FONT_SIZE = 18;
-const INDEX_FONT_SIZE = 11;
-const INDEX_OFFSET_Y = 22;
-const TRANSITION = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+const COLORS = {
+  default:     { fill: '#1f2335', stroke: '#292e42', text: '#565f89', indexText: '#3b4261' },
+  highlighted: { fill: '#1e2a4a', stroke: '#7aa2f7', text: '#c0caf5', indexText: '#7aa2f7' },
+  dimmed:      { fill: '#1a1b26', stroke: '#1f2335', text: '#2a2f45', indexText: '#1f2335' },
+};
 
 type ArrayCellProps = {
   entity: ArrayCellEntity;
@@ -28,38 +27,60 @@ type ArrayCellProps = {
 
 export function ArrayCell({ entity, position }: ArrayCellProps) {
   const { highlighted, dimmed } = entity.style;
-  const colors = highlighted ? COLORS.highlighted : dimmed ? COLORS.dimmed : COLORS.default;
-  const opacity = dimmed ? 0.35 : 1;
+
+  const c = dimmed      ? COLORS.dimmed
+          : highlighted ? COLORS.highlighted
+          : COLORS.default;
+
+  // Cell center for transform-origin
+  const cx = position.x + CELL_WIDTH / 2;
+  const cy = position.y + CELL_HEIGHT / 2;
 
   return (
-    <g style={{ transition: TRANSITION }} opacity={opacity}>
-      <rect
-        x={position.x} y={position.y}
-        width={CELL_WIDTH} height={CELL_HEIGHT}
-        rx={CORNER_RADIUS} ry={CORNER_RADIUS}
-        fill={colors.fill} stroke={colors.stroke}
-        strokeWidth={highlighted ? 2.5 : 1.5}
-        style={{
-          transition: TRANSITION,
-          filter: highlighted ? 'drop-shadow(0 0 8px rgba(241, 250, 140, 0.4))' : 'none',
-        }}
-      />
-      <text
-        x={position.x + CELL_WIDTH / 2}
-        y={position.y + CELL_HEIGHT / 2 + VALUE_FONT_SIZE * 0.35}
-        textAnchor="middle" fontSize={VALUE_FONT_SIZE}
-        fontWeight={highlighted ? '700' : '500'} fontFamily="monospace"
-        fill={colors.text} style={{ transition: TRANSITION }}
-      >
-        {entity.value}
-      </text>
-      <text
-        x={position.x + CELL_WIDTH / 2} y={position.y + CELL_HEIGHT + INDEX_OFFSET_Y}
-        textAnchor="middle" fontSize={INDEX_FONT_SIZE}
-        fontFamily="monospace" fill={colors.index} style={{ transition: TRANSITION }}
-      >
-        {entity.index}
-      </text>
+    <g style={{ transition: TRANSITION }}>
+      <g style={{
+        transformOrigin: `${cx}px ${cy}px`,
+        transform: highlighted ? 'scale(1.1) translateY(-4px)' : 'scale(1)',
+        transition: TRANS_SCALE,
+      }}>
+        {/* Cell body */}
+        <rect
+          x={position.x} y={position.y}
+          width={CELL_WIDTH} height={CELL_HEIGHT}
+          rx={R} ry={R}
+          fill={c.fill}
+          stroke={c.stroke}
+          strokeWidth={highlighted ? 2 : 1}
+          style={{ transition: TRANSITION }}
+        />
+
+        {/* Value */}
+        <text
+          x={position.x + CELL_WIDTH / 2}
+          y={position.y + CELL_HEIGHT / 2 + VALUE_FONT * 0.36}
+          textAnchor="middle"
+          fontSize={VALUE_FONT}
+          fontWeight={highlighted ? '700' : '500'}
+          fontFamily="'JetBrains Mono', 'Fira Code', monospace"
+          fill={c.text}
+          style={{ transition: TRANSITION }}
+        >
+          {entity.value}
+        </text>
+
+        {/* Index */}
+        <text
+          x={position.x + CELL_WIDTH / 2}
+          y={position.y + CELL_HEIGHT + INDEX_Y}
+          textAnchor="middle"
+          fontSize={INDEX_FONT}
+          fontFamily="'JetBrains Mono', 'Fira Code', monospace"
+          fill={c.indexText}
+          style={{ transition: TRANSITION }}
+        >
+          {entity.index}
+        </text>
+      </g>
     </g>
   );
 }

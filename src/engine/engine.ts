@@ -293,6 +293,13 @@ export class AnimationEngine {
   }
 
   /**
+   * Returns the programming language of the IR document.
+   */
+  getLanguage(): string {
+    return this.document.meta.language;
+  }
+
+  /**
    * Returns the source code string from the IR document.
    */
   getCode(): string {

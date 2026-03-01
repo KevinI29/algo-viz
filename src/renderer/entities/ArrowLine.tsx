@@ -1,22 +1,13 @@
 /**
  * algo.viz — ArrowLine Entity Renderer
- * ======================================
- * Renders an ARROW entity as a directed SVG line with an arrowhead.
- * Endpoints are computed by the layout engine (circle-edge aware).
+ * Tokyo Night palette. No glow filters — color change only on highlight.
  */
 
-import type { ArrowEntity } from '../../ir/ir.types';
-import type { Scene } from '../../ir/ir.types';
+import type { ArrowEntity, Scene } from '../../ir/ir.types';
 import { getArrowPoints } from '../layout';
 
-const COLORS = {
-  default:     { stroke: '#6272a4', head: '#6272a4' },
-  highlighted: { stroke: '#f1fa8c', head: '#f1fa8c' },
-  dimmed:      { stroke: '#2a2a3d', head: '#2a2a3d' },
-};
-
-const TRANSITION = 'all 0.45s cubic-bezier(0.4, 0, 0.2, 1)';
-const ARROW_HEAD_SIZE = 8;
+const TRANSITION      = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+const ARROW_HEAD_SIZE = 9;
 
 type ArrowLineProps = {
   entity: ArrowEntity;
@@ -25,34 +16,33 @@ type ArrowLineProps = {
 
 export function ArrowLine({ entity, scene }: ArrowLineProps) {
   const { highlighted, dimmed } = entity.style;
-  const colors = highlighted ? COLORS.highlighted : dimmed ? COLORS.dimmed : COLORS.default;
-  const opacity = dimmed ? 0.3 : 1;
-
   const points = getArrowPoints(entity.fromId, entity.toId, scene);
   if (!points) return null;
 
   const { x1, y1, x2, y2 } = points;
+  const opacity = dimmed ? 0.15 : 1;
 
-  // Compute arrowhead angle
+  // Tokyo Night: muted default, bright blue on highlight
+  const stroke      = highlighted ? '#7aa2f7' : '#3b4261';
+  const strokeWidth = highlighted ? 2.2 : 1.5;
+
   const angle = Math.atan2(y2 - y1, x2 - x1);
-  const headX1 = x2 - ARROW_HEAD_SIZE * Math.cos(angle - Math.PI / 7);
-  const headY1 = y2 - ARROW_HEAD_SIZE * Math.sin(angle - Math.PI / 7);
-  const headX2 = x2 - ARROW_HEAD_SIZE * Math.cos(angle + Math.PI / 7);
-  const headY2 = y2 - ARROW_HEAD_SIZE * Math.sin(angle + Math.PI / 7);
+  const hx1 = x2 - ARROW_HEAD_SIZE * Math.cos(angle - Math.PI / 7);
+  const hy1 = y2 - ARROW_HEAD_SIZE * Math.sin(angle - Math.PI / 7);
+  const hx2 = x2 - ARROW_HEAD_SIZE * Math.cos(angle + Math.PI / 7);
+  const hy2 = y2 - ARROW_HEAD_SIZE * Math.sin(angle + Math.PI / 7);
 
   return (
     <g style={{ transition: TRANSITION }} opacity={opacity}>
-      {/* Shaft */}
       <line
         x1={x1} y1={y1} x2={x2} y2={y2}
-        stroke={colors.stroke}
-        strokeWidth={highlighted ? 2 : 1.5}
+        stroke={stroke}
+        strokeWidth={strokeWidth}
         style={{ transition: TRANSITION }}
       />
-      {/* Arrowhead */}
       <polygon
-        points={`${x2},${y2} ${headX1},${headY1} ${headX2},${headY2}`}
-        fill={colors.head}
+        points={`${x2},${y2} ${hx1},${hy1} ${hx2},${hy2}`}
+        fill={stroke}
         style={{ transition: TRANSITION }}
       />
     </g>

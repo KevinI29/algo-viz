@@ -1,71 +1,75 @@
 /**
  * algo.viz — NodeCircle Entity Renderer
- * =======================================
- * Renders a NODE entity as an SVG circle with its value centered inside.
- * Position represents the CENTER of the circle.
+ * Tokyo Night palette. Scale + lift on highlight. No glow filters.
  */
 
 import type { NodeEntity } from '../../ir/ir.types';
 import type { PixelPosition } from '../layout';
 import { NODE_RADIUS } from '../layout';
 
-const COLORS = {
-  default:     { fill: '#1e1e2e', stroke: '#bd93f9', text: '#cdd6f4' },
-  highlighted: { fill: '#2d2b55', stroke: '#f1fa8c', text: '#f1fa8c' },
-  dimmed:      { fill: '#12121a', stroke: '#313244', text: '#44475a' },
-  null:        { fill: '#0f0f0f', stroke: '#44475a', text: '#6272a4' },
-};
+const TRANSITION  = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+const TRANS_SCALE = 'transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)';
+const FONT_SIZE   = 15;
 
-const FONT_SIZE  = 16;
-const TRANSITION = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+const COLORS = {
+  default:     { fill: '#292e42', stroke: '#414868', text: '#a9b1d6' },
+  highlighted: { fill: '#364a82', stroke: '#7aa2f7', text: '#c0caf5' },
+  dimmed:      { fill: '#1f2335', stroke: '#292e42', text: '#3b4261' },
+  null:        { fill: '#1f2335', stroke: '#292e42', text: '#3b4261' },
+};
 
 type NodeCircleProps = {
   entity: NodeEntity;
-  position: PixelPosition; // CENTER of the circle
+  position: PixelPosition;
+  index: number;
 };
 
 export function NodeCircle({ entity, position }: NodeCircleProps) {
   const { highlighted, dimmed } = entity.style;
   const isNull = entity.value === '∅';
 
-  const colors = isNull
-    ? COLORS.null
-    : highlighted
-    ? COLORS.highlighted
-    : dimmed
-    ? COLORS.dimmed
-    : COLORS.default;
+  const c = dimmed      ? COLORS.dimmed
+          : isNull      ? COLORS.null
+          : highlighted ? COLORS.highlighted
+          : COLORS.default;
 
-  const opacity = dimmed ? 0.35 : 1;
+  const scale = highlighted ? 'scale(1.13)' : 'scale(1)';
 
   return (
-    <g style={{ transition: TRANSITION }} opacity={opacity}>
-      <circle
-        cx={position.x}
-        cy={position.y}
-        r={NODE_RADIUS}
-        fill={colors.fill}
-        stroke={colors.stroke}
-        strokeWidth={highlighted ? 2.5 : 1.5}
-        style={{
-          transition: TRANSITION,
-          filter: highlighted
-            ? 'drop-shadow(0 0 10px rgba(241, 250, 140, 0.45))'
-            : 'none',
-        }}
-      />
-      <text
-        x={position.x}
-        y={position.y + FONT_SIZE * 0.36}
-        textAnchor="middle"
-        fontSize={FONT_SIZE}
-        fontWeight={highlighted ? '700' : '500'}
-        fontFamily="monospace"
-        fill={colors.text}
-        style={{ transition: TRANSITION }}
-      >
-        {entity.value}
-      </text>
+    <g style={{ transition: TRANSITION }}>
+      <g style={{
+        transformOrigin: `${position.x}px ${position.y}px`,
+        transform: highlighted ? `${scale} translateY(-3px)` : scale,
+        transition: TRANS_SCALE,
+      }}>
+        <circle
+          cx={position.x} cy={position.y} r={NODE_RADIUS}
+          fill={c.fill}
+          stroke={c.stroke}
+          strokeWidth={highlighted ? 2 : 1.5}
+          style={{ transition: TRANSITION }}
+        />
+        <circle
+          cx={position.x - NODE_RADIUS * 0.22}
+          cy={position.y - NODE_RADIUS * 0.28}
+          r={NODE_RADIUS * 0.18}
+          fill="white"
+          fillOpacity={highlighted ? 0.12 : 0.05}
+          style={{ transition: TRANSITION }}
+        />
+        <text
+          x={position.x}
+          y={position.y + FONT_SIZE * 0.36}
+          textAnchor="middle"
+          fontSize={FONT_SIZE}
+          fontWeight={highlighted ? '700' : '500'}
+          fontFamily="'JetBrains Mono', 'Fira Code', monospace"
+          fill={c.text}
+          style={{ transition: TRANSITION }}
+        >
+          {entity.value}
+        </text>
+      </g>
     </g>
   );
 }
