@@ -173,25 +173,26 @@ function applyMutation(scene: Scene, mutation: Mutation): Scene {
       const entityB = entities[mutation.payload.withId];
       if (!entityA || !entityB) break;
 
-      // Swap positions
+      // Swap positions — values stay with their entity so they visually move
       const posA: EntityPosition = entityA.position;
       const posB: EntityPosition = entityB.position;
 
-      // For ARRAY_CELL entities: also swap values and index
+      // For ARRAY_CELL: swap position AND index (both control visual placement)
+      // but KEEP values — the value travels with its entity to the new spot
       if (entityA.type === 'ARRAY_CELL' && entityB.type === 'ARRAY_CELL') {
         const cellA = entityA as ArrayCellEntity;
         const cellB = entityB as ArrayCellEntity;
         entities[mutation.targetId] = {
           ...cellA,
           position: posB,
-          value: cellB.value,
           index: cellB.index,
+          // value stays as cellA.value — it moves to B's position
         };
         entities[mutation.payload.withId] = {
           ...cellB,
           position: posA,
-          value: cellA.value,
           index: cellA.index,
+          // value stays as cellB.value — it moves to A's position
         };
       } else {
         // For all other entity types: swap positions only

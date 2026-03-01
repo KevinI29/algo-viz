@@ -7,7 +7,7 @@
  * This is the only file that knows about canvas dimensions.
  */
 
-import type { Entity, EntityId, Scene } from '../ir/ir.types';
+import type { Entity, EntityId, Scene, VariableLabelEntity } from '../ir/ir.types';
 
 // =============================================================================
 // LAYOUT CONSTANTS — ARRAY CELLS
@@ -101,15 +101,20 @@ export function getEntityPixelPosition(
     const targetPos = getEntityPixelPosition(target, scene);
 
     // Center the label over the target
-    // For NODE targets (circle center), offset by -LABEL_WIDTH/2
-    // For ARRAY_CELL targets (top-left), offset to center over cell
     const targetCenterX =
       target.type === 'NODE'
         ? targetPos.x
         : targetPos.x + CELL_WIDTH / 2;
 
+    // Offset multiple labels targeting the same entity so they don't stack
+    const allLabels = Object.values(scene.entities)
+      .filter(e => e.type === 'VARIABLE_LABEL' && (e as VariableLabelEntity).targetId === entity.targetId)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    const labelIndex = allLabels.findIndex(l => l.id === entity.id);
+    const xOffset = labelIndex * (LABEL_WIDTH + 6) - ((allLabels.length - 1) * (LABEL_WIDTH + 6)) / 2;
+
     return {
-      x: targetCenterX - LABEL_WIDTH / 2,
+      x: targetCenterX - LABEL_WIDTH / 2 + xOffset,
       y: LABEL_Y,
     };
   }

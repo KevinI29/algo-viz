@@ -2,10 +2,12 @@
  * algo.viz — Step Controls
  * ==========================
  * Bottom bar with:
+ *   - Play / Pause auto-advance button
  *   - Previous / Next navigation buttons
+ *   - Speed toggle (2s / 3s / 5s)
  *   - Step explanation text (the learning content)
  *   - Visual progress bar with clickable step dots
- *   - Keyboard shortcut hint
+ *   - Keyboard shortcut hints
  */
 
 import type { EngineSnapshot } from './types'
@@ -15,9 +17,16 @@ type StepControlsProps = {
   onPrev: () => void
   onNext: () => void
   onGoToStep: (index: number) => void
+  isPlaying: boolean
+  onTogglePlay: () => void
+  speedLabel: string
+  onCycleSpeed: () => void
 }
 
-export function StepControls({ engineState, onPrev, onNext, onGoToStep }: StepControlsProps) {
+export function StepControls({
+  engineState, onPrev, onNext, onGoToStep,
+  isPlaying, onTogglePlay, speedLabel, onCycleSpeed,
+}: StepControlsProps) {
   const { currentStepIndex, totalSteps, isFirstStep, isLastStep, currentStep } = engineState
   const progress = totalSteps > 0 ? (currentStepIndex / totalSteps) * 100 : 0
 
@@ -29,7 +38,7 @@ export function StepControls({ engineState, onPrev, onNext, onGoToStep }: StepCo
       backdropFilter: 'blur(20px)',
       zIndex: 10,
     }}>
-      {/* Progress bar */}
+      {/* Progress dots + bar */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: '6px',
         padding: '8px 24px 0',
@@ -51,21 +60,36 @@ export function StepControls({ engineState, onPrev, onNext, onGoToStep }: StepCo
 
       {/* Controls row */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: '16px',
+        display: 'flex', alignItems: 'center', gap: '10px',
         padding: '12px 24px 16px',
         minHeight: 64,
       }}>
+        {/* Play / Pause */}
+        <button
+          onClick={onTogglePlay}
+          className={`play-btn ${isPlaying ? 'playing' : ''}`}
+          title={isPlaying ? 'Pause (space)' : isLastStep ? 'Replay (space)' : 'Play (space)'}
+        >
+          {isPlaying ? '⏸' : isLastStep ? '↻' : '▶'}
+        </button>
+
+        {/* Speed toggle */}
+        <button
+          onClick={onCycleSpeed}
+          className="speed-btn"
+          title="Cycle speed"
+        >
+          {speedLabel}
+        </button>
+
         <button onClick={onPrev} disabled={isFirstStep} className="nav-btn">
           ← Prev
         </button>
 
-        <p style={{
-          flex: 1, fontSize: 13, color: 'var(--text2)', lineHeight: 1.7,
-          fontFamily: 'JetBrains Mono, monospace',
-        }}>
+        <p className="step-explanation">
           {isFirstStep
             ? <span style={{ color: 'var(--text3)' }}>
-                Press <span style={{ color: 'var(--purple3)' }}>Next →</span> to begin the walkthrough
+                Press <span style={{ color: 'var(--purple3)' }}>▶ Play</span> or <span style={{ color: 'var(--purple3)' }}>Next →</span> to begin
               </span>
             : currentStep?.explanation}
         </p>
@@ -74,12 +98,8 @@ export function StepControls({ engineState, onPrev, onNext, onGoToStep }: StepCo
           Next →
         </button>
 
-        <span style={{
-          fontSize: 10, color: 'var(--text3)',
-          fontFamily: 'JetBrains Mono, monospace',
-          opacity: 0.6,
-        }}>
-          ← → keys
+        <span className="keyboard-hint">
+          space ← →
         </span>
       </div>
     </div>

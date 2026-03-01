@@ -40,7 +40,7 @@ export function CodePanel({ codeLines, activeLines, language }: CodePanelProps) 
   }, [activeLines])
 
   return (
-    <div style={{
+    <div className="code-panel" style={{
       width: 320, minWidth: 260, flexShrink: 0,
       borderRight: '1px solid var(--border)',
       background: 'var(--surface)',

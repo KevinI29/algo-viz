@@ -261,7 +261,7 @@ Below is a complete, valid IRDocument. Study its structure carefully.
 3. **Mutation order matters**: Applied in array order. Highlight before dim. Create before reference. Unhighlight old before highlighting new.
 4. **Always unhighlight**: When focus moves to a new entity, UNHIGHLIGHT the previous one first. Don't leave orphan highlights.
 5. **Paired pointer mutations**: For linked lists, always use REDIRECT_ARROW + UPDATE_POINTER together when changing a pointer.
-6. **SWAP_POSITIONS**: For sorting — atomically swaps positions, values, and indices of two ARRAY_CELL entities.
+6. **SWAP_POSITIONS**: For sorting — visually swaps two ARRAY_CELL entities so their values appear to move positions.
 7. **UPDATE_STYLE colors**: Orange #ff9e64 = comparing, Purple #bb9af7 = active/swapping, Green #9ece6a = sorted/found, null = reset.
 8. **Step count**: 5-8 steps. Each step = one conceptual beat.
 9. **codeLines**: 1-based, matching actual lines in code.source. Count carefully — empty lines count too.

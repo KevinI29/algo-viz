@@ -1,7 +1,8 @@
 /**
- * algo.viz — Header
+ * Study AI — Header
  * ==================
- * Persistent top bar with logo, search input, and animation state badges.
+ * Minimal header with "Study AI" branding.
+ * Shows search bar only during idle/loading states.
  */
 
 import { useState, useRef, useEffect } from 'react'
@@ -32,100 +33,91 @@ export function Header({
     if (ev.key === 'Enter') onGenerate(searchValue)
   }
 
+  const showSearch = !isAnimating;
+
   return (
     <header style={{
       display: 'flex', alignItems: 'center', gap: '16px',
-      padding: '14px 24px', flexShrink: 0, position: 'relative', zIndex: 10,
-      borderBottom: '1px solid var(--border)',
-      background: 'rgba(6, 4, 15, 0.8)',
-      backdropFilter: 'blur(20px)',
+      padding: '16px 28px', flexShrink: 0, position: 'relative', zIndex: 10,
     }}>
       {/* Logo */}
       <button onClick={onReset} style={{
         background: 'none', border: 'none', cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: '6px', padding: 0,
+        display: 'flex', alignItems: 'baseline', gap: '6px', padding: 0,
       }}>
-        <div style={{
-          width: 28, height: 28, borderRadius: 8,
-          background: 'linear-gradient(135deg, #7c3aed, #4c1d95)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: '0 0 16px rgba(124,58,237,0.4)',
-          fontSize: 13, fontWeight: 800, color: '#fff', fontFamily: 'Syne, sans-serif',
-        }}>A</div>
         <span style={{
-          fontSize: 15, fontWeight: 800, color: 'var(--text)',
-          fontFamily: 'Syne, sans-serif', letterSpacing: '-0.02em',
+          fontSize: 20, fontWeight: 600, color: 'var(--text2)',
+          fontFamily: 'Syne, sans-serif', letterSpacing: '-0.01em',
         }}>
-          algo<span style={{ color: 'var(--purple2)' }}>.</span>viz
+          Study
+        </span>
+        <span style={{
+          fontSize: 20, fontWeight: 800, color: '#ffffff',
+          fontFamily: 'Syne, sans-serif', letterSpacing: '-0.01em',
+        }}>
+          AI
         </span>
       </button>
 
-      {/* Search bar */}
-      <div style={{
-        flex: 1, maxWidth: 560, display: 'flex', gap: '8px',
-        background: 'rgba(18, 14, 32, 0.9)',
-        border: `1px solid ${inputFocused ? 'var(--purple)' : 'var(--border)'}`,
-        borderRadius: 10, padding: '3px 3px 3px 14px',
-        transition: 'all 0.2s',
-        boxShadow: inputFocused ? '0 0 0 3px rgba(124,58,237,0.12)' : 'none',
-      }}>
-        <input
-          ref={inputRef}
-          className="search-input"
-          placeholder="Ask anything… Binary Search, Heaps, BFS, Recursion"
-          value={searchValue}
-          onChange={e => onSearchChange(e.target.value)}
-          onKeyDown={handleKey}
-          onFocus={() => setInputFocused(true)}
-          onBlur={() => setInputFocused(false)}
-          disabled={isLoading}
-          style={{
-            flex: 1, background: 'none', border: 'none', outline: 'none',
-            color: 'var(--text)', fontSize: 13, fontFamily: 'JetBrains Mono, monospace',
-            padding: '7px 0',
-          }}
-        />
-        <button
-          className="explain-btn"
-          onClick={() => onGenerate(searchValue)}
-          disabled={isLoading}
-        >
-          {isLoading ? '···' : 'Explain →'}
-        </button>
-      </div>
+      <div style={{ flex: 1 }} />
 
-      {/* Step counter */}
-      {isAnimating && engineState && (
+      {/* Inline search during non-animation states */}
+      {showSearch && (
         <div style={{
-          padding: '5px 12px', borderRadius: 20,
-          background: 'rgba(124,58,237,0.1)',
-          border: '1px solid rgba(124,58,237,0.25)',
-          fontSize: 11, color: 'var(--purple3)',
-          fontFamily: 'JetBrains Mono, monospace',
+          maxWidth: 420, display: 'flex', gap: '8px',
+          background: 'rgba(18, 14, 32, 0.8)',
+          border: `1px solid ${inputFocused ? 'var(--purple)' : 'var(--border)'}`,
+          borderRadius: 24, padding: '3px 3px 3px 16px',
+          transition: 'all 0.2s',
+          boxShadow: inputFocused ? '0 0 0 3px rgba(124,58,237,0.12)' : 'none',
         }}>
-          {engineState.isFirstStep ? 'ready' : `${engineState.currentStepIndex} / ${engineState.totalSteps}`}
+          <input
+            ref={inputRef}
+            className="search-input"
+            placeholder="Search concepts…"
+            value={searchValue}
+            onChange={e => onSearchChange(e.target.value)}
+            onKeyDown={handleKey}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            disabled={isLoading}
+            style={{
+              flex: 1, background: 'none', border: 'none', outline: 'none',
+              color: 'var(--text)', fontSize: 13, fontFamily: 'JetBrains Mono, monospace',
+              padding: '6px 0', minWidth: 180,
+            }}
+          />
+          <button
+            className="explain-btn"
+            onClick={() => onGenerate(searchValue)}
+            disabled={isLoading}
+            style={{ borderRadius: 20, padding: '8px 18px', fontSize: 12 }}
+          >
+            {isLoading ? '···' : 'Go →'}
+          </button>
         </div>
       )}
 
-      {/* Concept badge */}
-      {isAnimating && concept && (
-        <div style={{
-          padding: '5px 12px', borderRadius: 20,
-          background: 'rgba(16,185,129,0.08)',
-          border: '1px solid rgba(16,185,129,0.2)',
+      {/* Back button during animation */}
+      {showNewButton && (
+        <button onClick={onReset} className="nav-btn" style={{
+          fontSize: 12, padding: '6px 16px', borderRadius: 20,
+        }}>
+          ← New topic
+        </button>
+      )}
+
+      {/* Step badge */}
+      {isAnimating && engineState && !engineState.isFirstStep && (
+        <div className="header-badge" style={{
+          padding: '5px 14px', borderRadius: 20,
+          background: 'rgba(115,218,202,0.08)',
+          border: '1px solid rgba(115,218,202,0.2)',
           fontSize: 11, color: 'var(--teal2)',
           fontFamily: 'JetBrains Mono, monospace',
-          maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
         }}>
-          {concept}
+          {engineState.currentStepIndex} / {engineState.totalSteps}
         </div>
-      )}
-
-      {/* New button */}
-      {showNewButton && (
-        <button onClick={onReset} className="nav-btn" style={{ fontSize: 11, padding: '5px 14px' }}>
-          ← New
-        </button>
       )}
     </header>
   )
