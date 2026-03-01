@@ -1,0 +1,248 @@
+/**
+ * algo.viz — Global Styles
+ * =========================
+ * Tokyo Night color palette, typography, keyframes, and shared component classes.
+ * Extracted from inline <style> tag in App.tsx.
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Syne:wght@400;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ── Tokyo Night ── */
+  --bg:          #1a1b26;
+  --bg2:         #1f2335;
+  --bg3:         #24283b;
+  --surface:     rgba(31, 35, 53, 0.92);
+  --surface2:    rgba(36, 40, 59, 0.95);
+  --border:      rgba(65, 72, 104, 0.35);
+  --border2:     rgba(65, 72, 104, 0.65);
+
+  /* accent */
+  --purple:      #9d7cd8;
+  --purple2:     #bb9af7;
+  --purple3:     #c0caf5;
+
+  /* teal */
+  --teal:        #73daca;
+  --teal2:       #b4f9f8;
+
+  /* text */
+  --text:        #c0caf5;
+  --text2:       #a9b1d6;
+  --text3:       #565f89;
+
+  /* syntax */
+  --syn-keyword:  #bb9af7;
+  --syn-builtin:  #7dcfff;
+  --syn-string:   #9ece6a;
+  --syn-number:   #ff9e64;
+  --syn-comment:  #565f89;
+  --syn-variable: #e0af68;
+  --syn-default:  #a9b1d6;
+
+  /* code active line */
+  --code-active-bg:   rgba(187, 154, 247, 0.10);
+  --code-active-bar:  #bb9af7;
+
+  --radius:      12px;
+  --radius-sm:   8px;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── Keyframes ── */
+@keyframes spin    { to { transform: rotate(360deg); } }
+@keyframes fadeIn  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse   { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.fade-in { animation: fadeIn 0.5s ease forwards; }
+
+/* ── Search input ── */
+.search-input:focus {
+  outline: none;
+  border-color: var(--purple) !important;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15);
+}
+
+/* ── Suggestion chips ── */
+.chip {
+  padding: 6px 14px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  border-radius: 20px;
+  font-size: 12px;
+  color: var(--purple3);
+  cursor: pointer;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.chip:hover {
+  background: rgba(124, 58, 237, 0.18);
+  border-color: var(--purple2);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+/* ── Nav buttons ── */
+.nav-btn {
+  padding: 9px 22px;
+  background: rgba(26, 20, 46, 0.9);
+  color: var(--text2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.nav-btn:hover:not(:disabled) {
+  background: rgba(124, 58, 237, 0.15);
+  border-color: var(--purple2);
+  color: var(--text);
+}
+.nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+/* ── Code panel ── */
+.code-line:hover { background: rgba(124, 58, 237, 0.06) !important; }
+
+/* ── Explain button ── */
+.explain-btn {
+  padding: 10px 22px;
+  background: linear-gradient(135deg, #7c3aed, #5b21b6);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: 'Syne', sans-serif;
+  letter-spacing: 0.03em;
+  transition: all 0.2s;
+  white-space: nowrap;
+  box-shadow: 0 4px 20px rgba(124, 58, 237, 0.3);
+}
+.explain-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(124, 58, 237, 0.45);
+}
+.explain-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Step progress bar ── */
+.step-progress-track {
+  flex: 1;
+  height: 3px;
+  background: rgba(65, 72, 104, 0.3);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.step-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--purple), var(--teal));
+  border-radius: 2px;
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ── Step dots (clickable) ── */
+.step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border2);
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s;
+}
+.step-dot:hover {
+  border-color: var(--purple2);
+  transform: scale(1.3);
+}
+.step-dot[data-active="true"] {
+  background: var(--purple2);
+  border-color: var(--purple2);
+}
+.step-dot[data-visited="true"] {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+/* ── Markdown explanation content ── */
+.explanation-content h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'Syne', sans-serif;
+  margin: 28px 0 12px 0;
+}
+.explanation-content h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text2);
+  font-family: 'Syne', sans-serif;
+  margin: 20px 0 8px 0;
+}
+.explanation-content p {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.85;
+  margin: 0 0 12px 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+.explanation-content strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.explanation-content code {
+  background: rgba(124, 58, 237, 0.1);
+  border: 1px solid rgba(124, 58, 237, 0.15);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 13px;
+  color: var(--purple2);
+  font-family: 'JetBrains Mono', monospace;
+}
+.explanation-content pre {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 16px;
+  margin: 12px 0 16px 0;
+  overflow-x: auto;
+}
+.explanation-content pre code {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text2);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.explanation-content ul, .explanation-content ol {
+  margin: 8px 0 12px 24px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.85;
+}
+.explanation-content li {
+  margin-bottom: 4px;
+}
