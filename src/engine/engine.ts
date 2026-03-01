@@ -29,6 +29,7 @@ import type {
   VariableLabelEntity,
   NodeEntity,
   ArrayCellEntity,
+  EntityPosition,
 } from '../ir/ir.types';
 
 // =============================================================================
@@ -163,6 +164,49 @@ function applyMutation(scene: Scene, mutation: Mutation): Scene {
       entities[mutation.targetId] = {
         ...(entity as NodeEntity),
         pointsTo: mutation.payload.pointsTo ?? undefined,
+      };
+      break;
+    }
+
+    case 'SWAP_POSITIONS': {
+      const entityA = entities[mutation.targetId];
+      const entityB = entities[mutation.payload.withId];
+      if (!entityA || !entityB) break;
+
+      // Swap positions
+      const posA: EntityPosition = entityA.position;
+      const posB: EntityPosition = entityB.position;
+
+      // For ARRAY_CELL entities: also swap values and index
+      if (entityA.type === 'ARRAY_CELL' && entityB.type === 'ARRAY_CELL') {
+        const cellA = entityA as ArrayCellEntity;
+        const cellB = entityB as ArrayCellEntity;
+        entities[mutation.targetId] = {
+          ...cellA,
+          position: posB,
+          value: cellB.value,
+          index: cellB.index,
+        };
+        entities[mutation.payload.withId] = {
+          ...cellB,
+          position: posA,
+          value: cellA.value,
+          index: cellA.index,
+        };
+      } else {
+        // For all other entity types: swap positions only
+        entities[mutation.targetId] = { ...entityA, position: posB };
+        entities[mutation.payload.withId] = { ...entityB, position: posA };
+      }
+      break;
+    }
+
+    case 'UPDATE_STYLE': {
+      const entity = entities[mutation.targetId];
+      if (!entity) break;
+      entities[mutation.targetId] = {
+        ...entity,
+        style: { ...entity.style, ...mutation.payload.style },
       };
       break;
     }

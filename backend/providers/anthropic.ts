@@ -40,7 +40,8 @@ export class AnthropicProvider implements AIProvider {
 
     const response = await client.messages.create({
       model: this.model,
-      max_tokens: 4096,
+      max_tokens: 8192,
+      temperature: 0.2,         // Low temperature for structured, consistent output
       system: systemMessage,
       messages: userMessages,
     });

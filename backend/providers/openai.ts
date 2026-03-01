@@ -30,7 +30,7 @@ export class OpenAIProvider implements AIProvider {
         content: m.content,
       })),
       temperature: 0.2,       // Low temperature — we want structured, consistent output
-      max_tokens: 4096,
+      max_tokens: 8192,
       response_format: { type: 'json_object' }, // Force JSON output
     });
 

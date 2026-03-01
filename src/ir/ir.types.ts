@@ -11,7 +11,7 @@
  * - Do NOT modify this file without versioning the change and updating
  *   both the AI prompt layer and the renderer simultaneously.
  *
- * VERSION: 1.0.0
+ * VERSION: 1.1.0
  */
 
 // =============================================================================
@@ -222,7 +222,9 @@ export type MutationType =
   | 'MOVE_ENTITY'         // Change the logical (and optionally absolute) position
   | 'REDIRECT_ARROW'      // Change an ARROW entity's toId (pointer reassignment)
   | 'UPDATE_TARGET'       // Change a VARIABLE_LABEL's targetId (variable reassignment)
-  | 'UPDATE_POINTER';     // Change a NODE's pointsTo (logical pointer reassignment)
+  | 'UPDATE_POINTER'      // Change a NODE's pointsTo (logical pointer reassignment)
+  | 'SWAP_POSITIONS'      // Atomically swap positions (and values) of two entities
+  | 'UPDATE_STYLE';       // Set arbitrary style properties on an entity
 
 export type CreateEntityMutation = {
   type: 'CREATE_ENTITY';
@@ -291,6 +293,44 @@ export type UpdatePointerMutation = {
 };
 
 /**
+ * SWAP_POSITIONS mutation — atomically swaps two entities.
+ *
+ * For ARRAY_CELL entities: swaps both positions AND values (the visual swap).
+ * For all other entities: swaps only positions.
+ *
+ * This is the core sorting primitive. Without it, a swap requires 4+ mutations
+ * (save value A, set A = B, set B = saved, move A, move B) which is fragile
+ * and hard for the AI to get right.
+ *
+ * targetId: the first entity
+ * payload.withId: the second entity
+ */
+export type SwapPositionsMutation = {
+  type: 'SWAP_POSITIONS';
+  targetId: EntityId;
+  payload: { withId: EntityId };
+};
+
+/**
+ * UPDATE_STYLE mutation — sets arbitrary style properties on an entity.
+ *
+ * Unlike HIGHLIGHT/DIM which are binary flags, this lets the AI express
+ * semantic states like:
+ *   - comparing: { color: '#ff9e64' }       (orange)
+ *   - sorted:    { color: '#9ece6a' }       (green)
+ *   - default:   { color: undefined }        (reset to theme default)
+ *   - swapping:  { color: '#bb9af7' }       (purple)
+ *
+ * Only the properties present in payload.style are changed.
+ * Omitted properties are left unchanged.
+ */
+export type UpdateStyleMutation = {
+  type: 'UPDATE_STYLE';
+  targetId: EntityId;
+  payload: { style: Partial<EntityStyle> };
+};
+
+/**
  * Union type — any mutation in the system.
  */
 export type Mutation =
@@ -304,7 +344,9 @@ export type Mutation =
   | MoveEntityMutation
   | RedirectArrowMutation
   | UpdateTargetMutation
-  | UpdatePointerMutation;
+  | UpdatePointerMutation
+  | SwapPositionsMutation
+  | UpdateStyleMutation;
 
 // =============================================================================
 // SECTION 7: STEP
@@ -337,7 +379,7 @@ export type SupportedLanguage = 'python' | 'javascript' | 'typescript' | 'java';
 export type IRMeta = {
   concept: string;           // e.g. "Binary Search", "Reverse a Linked List"
   language: SupportedLanguage;
-  schemaVersion: '1.0.0';   // Must match this file's version. Bump on breaking changes.
+  schemaVersion: '1.0.0' | '1.1.0';   // Bump on breaking changes. 1.1.0 adds SWAP_POSITIONS + UPDATE_STYLE.
 };
 
 /**

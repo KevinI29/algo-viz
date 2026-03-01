@@ -21,6 +21,7 @@ const VALID_MUTATION_TYPES = [
   'DIM_ENTITY', 'UNDIM_ENTITY',
   'UPDATE_VALUE', 'MOVE_ENTITY',
   'REDIRECT_ARROW', 'UPDATE_TARGET', 'UPDATE_POINTER',
+  'SWAP_POSITIONS', 'UPDATE_STYLE',
 ];
 const VALID_LANGUAGES = ['python', 'javascript', 'typescript', 'java'];
 
@@ -43,8 +44,8 @@ export function validateIRDocument(raw: unknown): ValidationResult {
     if (!VALID_LANGUAGES.includes(meta.language as string)) {
       return { valid: false, error: `meta.language must be one of: ${VALID_LANGUAGES.join(', ')}` };
     }
-    if (meta.schemaVersion !== '1.0.0') {
-      return { valid: false, error: 'meta.schemaVersion must be "1.0.0"' };
+    if (meta.schemaVersion !== '1.0.0' && meta.schemaVersion !== '1.1.0') {
+      return { valid: false, error: 'meta.schemaVersion must be "1.0.0" or "1.1.0"' };
     }
 
     // --- code ---

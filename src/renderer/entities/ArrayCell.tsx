@@ -26,11 +26,17 @@ type ArrayCellProps = {
 };
 
 export function ArrayCell({ entity, position }: ArrayCellProps) {
-  const { highlighted, dimmed } = entity.style;
+  const { highlighted, dimmed, color, strokeColor } = entity.style;
 
   const c = dimmed      ? COLORS.dimmed
           : highlighted ? COLORS.highlighted
           : COLORS.default;
+
+  // Custom colors from UPDATE_STYLE override the theme defaults
+  const fill   = color       ?? c.fill;
+  const stroke = strokeColor ?? c.stroke;
+  const text   = color       ? '#ffffff' : c.text;   // white text on custom colors
+  const idx    = color       ? stroke    : c.indexText;
 
   // Cell center for transform-origin
   const cx = position.x + CELL_WIDTH / 2;
@@ -40,7 +46,7 @@ export function ArrayCell({ entity, position }: ArrayCellProps) {
     <g style={{ transition: TRANSITION }}>
       <g style={{
         transformOrigin: `${cx}px ${cy}px`,
-        transform: highlighted ? 'scale(1.1) translateY(-4px)' : 'scale(1)',
+        transform: (highlighted || color) ? 'scale(1.1) translateY(-4px)' : 'scale(1)',
         transition: TRANS_SCALE,
       }}>
         {/* Cell body */}
@@ -48,9 +54,9 @@ export function ArrayCell({ entity, position }: ArrayCellProps) {
           x={position.x} y={position.y}
           width={CELL_WIDTH} height={CELL_HEIGHT}
           rx={R} ry={R}
-          fill={c.fill}
-          stroke={c.stroke}
-          strokeWidth={highlighted ? 2 : 1}
+          fill={fill}
+          stroke={stroke}
+          strokeWidth={highlighted || color ? 2 : 1}
           style={{ transition: TRANSITION }}
         />
 
@@ -60,9 +66,9 @@ export function ArrayCell({ entity, position }: ArrayCellProps) {
           y={position.y + CELL_HEIGHT / 2 + VALUE_FONT * 0.36}
           textAnchor="middle"
           fontSize={VALUE_FONT}
-          fontWeight={highlighted ? '700' : '500'}
+          fontWeight={highlighted || color ? '700' : '500'}
           fontFamily="'JetBrains Mono', 'Fira Code', monospace"
-          fill={c.text}
+          fill={text}
           style={{ transition: TRANSITION }}
         >
           {entity.value}
@@ -75,7 +81,7 @@ export function ArrayCell({ entity, position }: ArrayCellProps) {
           textAnchor="middle"
           fontSize={INDEX_FONT}
           fontFamily="'JetBrains Mono', 'Fira Code', monospace"
-          fill={c.indexText}
+          fill={idx}
           style={{ transition: TRANSITION }}
         >
           {entity.index}
