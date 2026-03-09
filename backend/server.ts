@@ -20,11 +20,11 @@ import {
   buildIRGenerationPrompt,
   buildExplanationPrompt,
 } from './prompt';
+import { buildTeachPrompt } from './prompts/teacher';
 import { validateIRDocument } from './validator';
 import path from 'path';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-// =============================================================================
+dotenv.config({ path: path.resolve(process.cwd(), '..', '.env') });// =============================================================================
 // JSON EXTRACTION
 // LLMs sometimes wrap JSON in markdown code blocks — strip them before parsing.
 // =============================================================================
@@ -214,6 +214,79 @@ app.post('/api/generate', async (req, res) => {
     console.error('[Generate] Unexpected error:', err);
     return res.status(500).json({
       mode: 'error',
+      error: err instanceof Error ? err.message : 'Unknown error',
+    });
+  }
+});
+
+// =============================================================================
+// V2 ROUTE: POST /api/teach
+// =============================================================================
+
+/**
+ * POST /api/teach
+ * Body: { userInput: string, inputType: 'concept' | 'code' }
+ *
+ * Returns a LessonPlan JSON that the frontend uses to:
+ * 1. Select a simulator (or fall back to Pyodide)
+ * 2. Render the animation with the right visual template
+ * 3. Display code and explanations
+ */
+app.post('/api/teach', async (req, res) => {
+  const { userInput, inputType } = req.body;
+
+  if (!userInput || typeof userInput !== 'string' || !userInput.trim()) {
+    return res.status(400).json({ error: 'userInput is required' });
+  }
+
+  const cleanInput = userInput.trim();
+  const type = inputType === 'code' ? 'code' : 'concept';
+  console.log(`\n[Teach] Input: "${cleanInput.slice(0, 80)}..." (${type})`);
+
+  try {
+    const { system, user } = buildTeachPrompt(cleanInput, type);
+
+    const response = await provider.complete([
+      { role: 'system', content: system },
+      { role: 'user', content: user },
+    ]);
+
+    // Parse JSON
+    let lessonPlan: unknown;
+    try {
+      lessonPlan = JSON.parse(extractJSON(response.text));
+    } catch {
+      console.error('[Teach] Failed to parse LLM response as JSON');
+      console.error('[Teach] Raw:', response.text.slice(0, 500));
+
+      // Retry once
+      console.log('[Teach] Retrying...');
+      const retryResponse = await provider.complete([
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+        { role: 'assistant', content: response.text },
+        { role: 'user', content: 'Your response was not valid JSON. Return ONLY the raw JSON object. Start with { and end with }. No markdown wrapping.' },
+      ]);
+
+      try {
+        lessonPlan = JSON.parse(extractJSON(retryResponse.text));
+      } catch {
+        return res.status(500).json({ error: 'AI failed to produce valid JSON after retry' });
+      }
+    }
+
+    // Basic validation
+    const plan = lessonPlan as any;
+    if (!plan.concept || !plan.visualTemplate) {
+      return res.status(500).json({ error: 'AI returned incomplete lesson plan' });
+    }
+
+    console.log(`[Teach] ✅ Lesson plan: ${plan.concept} | simulator=${plan.simulator} | template=${plan.visualTemplate}`);
+    return res.json(plan);
+
+  } catch (err) {
+    console.error('[Teach] Error:', err);
+    return res.status(500).json({
       error: err instanceof Error ? err.message : 'Unknown error',
     });
   }

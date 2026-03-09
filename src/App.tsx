@@ -1,320 +1,460 @@
 /**
- * Study AI — Main App
+ * Study AI — App (v2)
  * =====================
- * Single-column layout: visualization → explanation → code.
- * Matches the "Study AI" design language.
+ * Full pipeline:
+ *   User types concept → classify → /api/teach → LessonPlan
+ *   → simulator → template mapper → AnimationTimeline → renderer
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { AnimationEngine } from './engine/engine'
-import { generateConcept } from './api/api'
-import { ErrorBoundary }   from './components/ErrorBoundary'
-import { Header }          from './components/Header'
-import { IdleScreen }      from './components/IdleScreen'
-import { LoadingScreen }   from './components/LoadingScreen'
-import { ErrorScreen }     from './components/ErrorScreen'
-import { ExplanationView } from './components/ExplanationView'
-import { SceneRenderer }   from './renderer/SceneRenderer'
-import { tokenizeLine }    from './lib/syntaxHighlighter'
-import type { AppState }   from './components/types'
-import type { IRDocument } from './ir/ir.types'
+import { fetchLessonPlan } from './api/teach'
+import { looksLikeCode, detectLanguage } from './router/classify'
+import { runLessonPlan } from './simulator/runner'
+import { compileTimeline } from './templates/registry'
+import { useAnimationPlayer } from './engine/useAnimationPlayer'
+import { SceneRenderer } from './renderer/v2/SceneRenderer'
+import { PlaybackControls } from './renderer/v2/PlaybackControls'
+import { tokenizeLine } from './lib/syntaxHighlighter'
+import type { LessonPlan } from './router/types'
+import type { AnimationTimeline } from './templates/types'
 import './styles/global.css'
 
-const AUTO_PLAY_SPEEDS = [2000, 3000, 5000] as const
-type SpeedIndex = 0 | 1 | 2
+// =============================================================================
+// APP STATE
+// =============================================================================
+
+type AppState =
+  | { status: 'idle' }
+  | { status: 'loading'; concept: string }
+  | { status: 'animation'; plan: LessonPlan; timeline: AnimationTimeline }
+  | { status: 'text'; plan: LessonPlan }
+  | { status: 'error'; message: string }
+
+// =============================================================================
+// SUGGESTIONS
+// =============================================================================
+
+const SUGGESTIONS = [
+  'Bubble Sort', 'Insertion Sort', 'BFS on a binary tree',
+  'Find middle of linked list', 'Valid Parentheses',
+  'Selection Sort', 'DFS pre-order', 'Reverse a linked list',
+]
+
+const CATEGORIES = ['Sorting', 'Trees', 'Linked Lists', 'Stacks']
+
+// =============================================================================
+// APP COMPONENT
+// =============================================================================
 
 export default function App() {
-  const [appState, setAppState]       = useState<AppState>({ status: 'idle' })
-  const [engineState, setEngineState] = useState<ReturnType<AnimationEngine['getState']> | null>(null)
+  const [appState, setAppState] = useState<AppState>({ status: 'idle' })
   const [searchValue, setSearchValue] = useState('')
-  const [isPlaying, setIsPlaying]     = useState(false)
-  const [speedIndex, setSpeedIndex]   = useState<SpeedIndex>(1)
-  const [showCode, setShowCode]       = useState(false)
-  const engineRef   = useRef<AnimationEngine | null>(null)
-  const abortRef    = useRef<AbortController | null>(null)
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [showCode, setShowCode] = useState(false)
+  const [inputFocused, setInputFocused] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const player = useAnimationPlayer()
 
-  // ── Auto-play ──
+  useEffect(() => { inputRef.current?.focus() }, [])
 
-  const clearAutoPlay = useCallback(() => {
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null }
-  }, [])
+  // ── Generate ──
 
-  const handleNext = useCallback(() => {
-    const e = engineRef.current; if (!e) return
-    const advanced = e.nextStep()
-    setEngineState(e.getState())
-    if (!advanced) { setIsPlaying(false); clearAutoPlay() }
-  }, [clearAutoPlay])
-
-  useEffect(() => {
-    clearAutoPlay()
-    if (isPlaying && appState.status === 'animation') {
-      intervalRef.current = setInterval(handleNext, AUTO_PLAY_SPEEDS[speedIndex])
-    }
-    return clearAutoPlay
-  }, [isPlaying, speedIndex, appState.status, handleNext, clearAutoPlay])
-
-  // ── Handlers ──
-
-  async function handleGenerate(concept: string) {
-    const trimmed = concept.trim()
+  const handleGenerate = useCallback(async (input: string) => {
+    const trimmed = input.trim()
     if (!trimmed) return
+
     abortRef.current?.abort()
-    setIsPlaying(false); clearAutoPlay()
-    const controller = new AbortController()
-    abortRef.current = controller
+    const ctrl = new AbortController()
+    abortRef.current = ctrl
+
     setSearchValue(trimmed)
     setAppState({ status: 'loading', concept: trimmed })
-    const result = await generateConcept(trimmed, controller.signal)
-    if (result.mode === 'aborted') return
-    if (result.mode === 'error')      { setAppState({ status: 'error', message: result.error }); return }
-    if (result.mode === 'explanation') { setAppState({ status: 'explanation', concept: trimmed, text: result.text }); return }
-    const engine = new AnimationEngine(result.document as IRDocument)
-    engineRef.current = engine
-    setEngineState(engine.getState())
-    setAppState({ status: 'animation', engine })
     setShowCode(false)
-  }
 
-  function handlePrev() {
-    const e = engineRef.current; if (!e) return
-    setIsPlaying(false); clearAutoPlay()
-    e.prevStep(); setEngineState(e.getState())
-  }
-  function handleGoToStep(index: number) {
-    const e = engineRef.current; if (!e) return
-    setIsPlaying(false); clearAutoPlay()
-    e.goToStep(index); setEngineState(e.getState())
-  }
-  function handleReset() {
-    abortRef.current?.abort()
-    setIsPlaying(false); clearAutoPlay()
-    setAppState({ status: 'idle' }); setSearchValue('')
-    engineRef.current = null; setEngineState(null)
-  }
-  function handleTogglePlay() {
-    if (!engineState) return
-    if (engineState.isLastStep) {
-      const e = engineRef.current; if (!e) return
-      e.goToStep(0); setEngineState(e.getState())
-      setIsPlaying(true); return
+    const inputType = looksLikeCode(trimmed) ? 'code' : 'concept'
+    const result = await fetchLessonPlan(trimmed, inputType, ctrl.signal)
+
+    if ('aborted' in result) return
+    if (!result.ok) {
+      setAppState({ status: 'error', message: result.error })
+      return
     }
-    setIsPlaying(prev => !prev)
-  }
-  function handleCycleSpeed() {
-    setSpeedIndex(prev => ((prev + 1) % 3) as SpeedIndex)
-  }
+
+    const plan = result.plan
+
+    // Text-only response?
+    if ((plan as any).textOnly || plan.codePosition === 'none') {
+      setAppState({ status: 'text', plan })
+      return
+    }
+
+    // Has simulator? Run it
+    if (plan.simulator) {
+      const events = runLessonPlan(plan)
+      if (!events) {
+        setAppState({ status: 'error', message: `Simulator "${plan.simulator}" failed to run` })
+        return
+      }
+      const timeline = compileTimeline(plan, events)
+      player.load(timeline)
+      setAppState({ status: 'animation', plan, timeline })
+      return
+    }
+
+    // No simulator — would need Pyodide (Phase 4)
+    // For now, show as text explanation
+    setAppState({ status: 'text', plan })
+  }, [player])
+
+  // ── Reset ──
+
+  const handleReset = useCallback(() => {
+    abortRef.current?.abort()
+    setAppState({ status: 'idle' })
+    setSearchValue('')
+    player.reset()
+    setTimeout(() => inputRef.current?.focus(), 100)
+  }, [player])
 
   // ── Keyboard ──
 
   useEffect(() => {
-    function onKeyDown(ev: KeyboardEvent) {
-      if (document.activeElement?.tagName === 'INPUT') return
+    function onKey(e: KeyboardEvent) {
+      if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return
       if (appState.status !== 'animation') return
-      if (ev.key === 'ArrowRight' || ev.key === 'ArrowDown') {
-        ev.preventDefault(); setIsPlaying(false); clearAutoPlay(); handleNext()
-      } else if (ev.key === 'ArrowLeft' || ev.key === 'ArrowUp') {
-        ev.preventDefault(); handlePrev()
-      } else if (ev.key === ' ') {
-        ev.preventDefault(); handleTogglePlay()
-      }
+      if (e.key === ' ') { e.preventDefault(); player.togglePlay() }
+      if (e.key === 'ArrowRight') { e.preventDefault(); player.nextFrame() }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); player.prevFrame() }
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   })
 
   // ── Derived ──
 
-  const activeLines  = engineRef.current?.getActiveLines() ?? []
-  const codeLines    = engineRef.current?.getCode().split('\n') ?? []
-  const codeLanguage = engineRef.current?.getLanguage() ?? 'python'
-  const isAnim       = appState.status === 'animation' && engineState
-  const concept      = engineRef.current?.getConcept() ?? null
-  const { currentStepIndex = 0, totalSteps = 0, isFirstStep = true, isLastStep = false, currentStep = null } = engineState ?? {}
+  const frame = player.state.currentFrame
+  const isAnim = appState.status === 'animation'
+  const plan = isAnim ? appState.plan : appState.status === 'text' ? appState.plan : null
 
-  // ── Render ──
+  // ==========================================================================
+  // RENDER
+  // ==========================================================================
 
   return (
-    <ErrorBoundary onReset={handleReset}>
-      <div style={{
-        display: 'flex', flexDirection: 'column', height: '100vh',
-        background: 'var(--bg)', overflow: 'hidden', position: 'relative',
+    <div style={{
+      display: 'flex', flexDirection: 'column', height: '100vh',
+      background: '#1a1b26', color: '#c0caf5', overflow: 'hidden',
+    }}>
+      {/* ── Header ── */}
+      <header style={{
+        display: 'flex', alignItems: 'center', gap: 16,
+        padding: '14px 24px', flexShrink: 0, zIndex: 10,
       }}>
-        <Header
-          searchValue={searchValue}
-          onSearchChange={setSearchValue}
-          onGenerate={handleGenerate}
-          onReset={handleReset}
-          isLoading={appState.status === 'loading'}
-          isAnimating={appState.status === 'animation'}
-          showNewButton={appState.status !== 'idle' && appState.status !== 'loading'}
-          engineState={engineState}
-          concept={concept}
-        />
+        <button onClick={handleReset} style={{
+          background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+          display: 'flex', alignItems: 'baseline', gap: 6,
+        }}>
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#a9b1d6', fontFamily: 'Syne, sans-serif' }}>Study</span>
+          <span style={{ fontSize: 18, fontWeight: 800, color: '#fff', fontFamily: 'Syne, sans-serif' }}>AI</span>
+        </button>
+        <div style={{ flex: 1 }} />
 
-        {appState.status === 'idle' && (
-          <IdleScreen onGenerate={handleGenerate} />
+        {/* New topic button when not idle */}
+        {appState.status !== 'idle' && appState.status !== 'loading' && (
+          <button onClick={handleReset} className="nav-btn" style={{ borderRadius: 20, padding: '6px 16px', fontSize: 12 }}>
+            ← New topic
+          </button>
         )}
 
-        {appState.status === 'loading' && (
-          <LoadingScreen concept={appState.concept} />
-        )}
-
-        {appState.status === 'error' && (
-          <ErrorScreen message={appState.message} onReset={handleReset} />
-        )}
-
-        {appState.status === 'explanation' && (
-          <ExplanationView concept={appState.concept} text={appState.text} />
-        )}
-
-        {/* ================================================================ */}
-        {/* ANIMATION — Single-column scrolling layout                       */}
-        {/* ================================================================ */}
-        {isAnim && (
-          <div className="fade-in" style={{
-            flex: 1, overflow: 'auto', zIndex: 1,
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            padding: '24px 24px 120px',
+        {/* Step counter */}
+        {isAnim && !player.state.isFirstFrame && (
+          <div style={{
+            padding: '5px 14px', borderRadius: 20,
+            background: 'rgba(115,218,202,0.08)',
+            border: '1px solid rgba(115,218,202,0.2)',
+            fontSize: 11, color: '#b4f9f8',
+            fontFamily: 'JetBrains Mono, monospace',
           }}>
-            {/* Section heading */}
+            {player.state.currentFrameIndex + 1} / {player.state.totalFrames}
+          </div>
+        )}
+      </header>
+
+      {/* ── Idle Screen ── */}
+      {appState.status === 'idle' && (
+        <div className="fade-in" style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center',
+          gap: 28, padding: '0 24px', marginTop: -60,
+        }}>
+          <h1 style={{
+            fontSize: 30, fontWeight: 600, color: '#e2e8f0',
+            fontFamily: 'Syne, sans-serif', letterSpacing: '-0.02em',
+          }}>
+            What are we learning today<span style={{ color: '#73daca' }}>?</span>
+          </h1>
+
+          <div style={{
+            width: '100%', maxWidth: 580, display: 'flex',
+            background: 'rgba(30,28,42,0.9)',
+            border: `1.5px solid ${inputFocused ? 'rgba(115,218,202,0.4)' : 'rgba(65,72,104,0.4)'}`,
+            borderRadius: 28, padding: '4px 6px 4px 22px',
+            transition: 'all 0.25s',
+            boxShadow: inputFocused ? '0 0 0 4px rgba(115,218,202,0.08)' : '0 2px 20px rgba(0,0,0,0.2)',
+          }}>
+            <input
+              ref={inputRef}
+              placeholder="Type a concept, algorithm, or paste code..."
+              value={searchValue}
+              onChange={e => setSearchValue(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleGenerate(searchValue)}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
+              style={{
+                flex: 1, background: 'none', border: 'none', outline: 'none',
+                color: '#c0caf5', fontSize: 14, fontFamily: 'JetBrains Mono, monospace',
+                padding: '12px 0',
+              }}
+            />
+            <button
+              className="explain-btn"
+              onClick={() => handleGenerate(searchValue)}
+              style={{ borderRadius: 22, padding: '10px 24px', fontSize: 13 }}
+            >
+              Explain →
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'center', maxWidth: 580 }}>
+            {SUGGESTIONS.map(s => (
+              <button key={s} className="chip" onClick={() => handleGenerate(s)}>{s}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Loading ── */}
+      {appState.status === 'loading' && (
+        <div className="fade-in" style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 20,
+        }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: '50%',
+            border: '2.5px solid rgba(115,218,202,0.2)',
+            borderTop: '2.5px solid #73daca',
+            animation: 'spin 0.75s linear infinite',
+          }} />
+          <p style={{ fontSize: 13, color: '#a9b1d6', fontFamily: 'JetBrains Mono, monospace' }}>
+            Planning lesson for <span style={{ color: '#73daca', fontWeight: 700 }}>"{appState.concept}"</span>
+          </p>
+        </div>
+      )}
+
+      {/* ── Error ── */}
+      {appState.status === 'error' && (
+        <div className="fade-in" style={{
+          flex: 1, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', justifyContent: 'center', gap: 16,
+        }}>
+          <div style={{
+            padding: '24px 32px', borderRadius: 12,
+            background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)',
+            maxWidth: 480, textAlign: 'center',
+          }}>
+            <p style={{ fontSize: 13, color: '#fca5a5', fontFamily: 'JetBrains Mono, monospace', lineHeight: 1.7 }}>
+              {appState.message}
+            </p>
+          </div>
+          <button onClick={handleReset} className="nav-btn">← Try again</button>
+        </div>
+      )}
+
+      {/* ── Text Explanation ── */}
+      {appState.status === 'text' && plan && (
+        <div className="fade-in" style={{
+          flex: 1, overflow: 'auto', padding: '40px 24px',
+          display: 'flex', justifyContent: 'center',
+        }}>
+          <div style={{ maxWidth: 680, width: '100%' }}>
             <h2 style={{
-              fontSize: 28, fontWeight: 700, color: '#e2e8f0',
-              fontFamily: 'Syne, sans-serif', letterSpacing: '-0.02em',
-              marginBottom: 32, alignSelf: 'flex-start', maxWidth: 720,
-              width: '100%', margin: '0 auto 24px',
+              fontSize: 26, fontWeight: 700, marginBottom: 16,
+              fontFamily: 'Syne, sans-serif', color: '#e2e8f0',
             }}>
-              How does it work?
+              {plan.concept}
             </h2>
+            <p style={{
+              fontSize: 14, color: '#a9b1d6', lineHeight: 1.85,
+              fontFamily: 'JetBrains Mono, monospace', whiteSpace: 'pre-wrap',
+            }}>
+              {plan.setupExplanation}
+            </p>
+            {plan.insightText && (
+              <div style={{
+                marginTop: 24, padding: '16px 20px', borderRadius: 10,
+                background: 'rgba(115,218,202,0.06)', border: '1px solid rgba(115,218,202,0.15)',
+              }}>
+                <p style={{ fontSize: 13, color: '#73daca', fontFamily: 'JetBrains Mono, monospace', lineHeight: 1.7 }}>
+                  {plan.insightText}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Animation ── */}
+      {isAnim && frame && (
+        <div className="fade-in" style={{
+          flex: 1, overflow: 'auto',
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
+          padding: '20px 24px 120px',
+        }}>
+          {/* Title */}
+          <h2 style={{
+            fontSize: 26, fontWeight: 700, color: '#e2e8f0',
+            fontFamily: 'Syne, sans-serif', marginBottom: 6,
+          }}>
+            {appState.plan.title || appState.plan.concept}
+          </h2>
+
+          {/* Setup explanation */}
+          <p style={{
+            fontSize: 13, color: '#a9b1d6', marginBottom: 20,
+            fontFamily: 'JetBrains Mono, monospace',
+            maxWidth: 600, textAlign: 'center', lineHeight: 1.7,
+          }}>
+            {appState.plan.setupExplanation}
+          </p>
+
+          {/* Animation area — code alongside or visualization only */}
+          <div style={{
+            width: '100%', maxWidth: 900,
+            display: 'flex', gap: 20, marginBottom: 12,
+          }}>
+            {/* Code panel (alongside mode) */}
+            {appState.plan.codePosition === 'alongside' && appState.plan.code && (
+              <div style={{
+                width: 300, flexShrink: 0,
+                background: 'rgba(22,20,35,0.9)',
+                border: '1px solid rgba(65,72,104,0.35)',
+                borderRadius: 12, padding: '16px 0',
+                overflow: 'auto', maxHeight: 340,
+              }}>
+                <div style={{
+                  padding: '0 16px 10px', fontSize: 10, fontWeight: 600,
+                  letterSpacing: '0.1em', color: '#565f89', textTransform: 'uppercase',
+                  fontFamily: 'Syne, sans-serif', borderBottom: '1px solid rgba(65,72,104,0.25)',
+                  marginBottom: 8,
+                }}>
+                  Source Code
+                </div>
+                {appState.plan.code.source.split('\n').map((line, i) => {
+                  const ln = i + 1
+                  const isActive = frame.codeLine === ln
+                  return (
+                    <div key={ln} style={{
+                      display: 'flex', padding: '0 16px',
+                      background: isActive ? 'rgba(115,218,202,0.08)' : 'transparent',
+                      borderLeft: isActive ? '2px solid #73daca' : '2px solid transparent',
+                      transition: 'all 0.25s',
+                    }}>
+                      <span style={{
+                        width: 28, textAlign: 'right', paddingRight: 10,
+                        fontSize: 11, lineHeight: '1.85',
+                        color: isActive ? 'rgba(115,218,202,0.7)' : '#3b4261',
+                        fontFamily: 'JetBrains Mono, monospace',
+                        userSelect: 'none', flexShrink: 0,
+                      }}>{ln}</span>
+                      <span style={{
+                        fontSize: 12, lineHeight: '1.85', whiteSpace: 'pre',
+                        fontFamily: 'JetBrains Mono, monospace',
+                        fontWeight: isActive ? 700 : 400,
+                      }}>
+                        {line.trim() ? tokenizeLine(line, appState.plan.code!.language).map((t, idx) => (
+                          <span key={idx} style={{ color: isActive ? '#b4f9f8' : t.color }}>{t.text}</span>
+                        )) : '\u00A0'}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
 
             {/* Visualization */}
-            <div style={{
-              width: '100%', maxWidth: 720,
-              display: 'flex', justifyContent: 'center',
-              marginBottom: 8,
-            }}>
-              <SceneRenderer scene={engineState.currentScene} />
+            <div style={{ flex: 1 }}>
+              <SceneRenderer
+                frame={frame}
+                template={appState.plan.visualTemplate}
+              />
             </div>
+          </div>
 
-            {/* Explanation text */}
-            <div style={{
-              width: '100%', maxWidth: 720,
-              marginBottom: 24,
+          {/* Step explanation */}
+          <div style={{ width: '100%', maxWidth: 900, minHeight: 44, marginBottom: 8 }}>
+            <p style={{
+              fontSize: 13, color: '#a9b1d6', lineHeight: 1.8,
+              fontFamily: 'JetBrains Mono, monospace',
             }}>
-              <p style={{
-                fontSize: 14, color: 'var(--text2)', lineHeight: 1.8,
-                fontFamily: 'JetBrains Mono, monospace',
-                minHeight: 48,
-              }}>
-                {isFirstStep
-                  ? <span style={{ color: 'var(--text3)' }}>
-                      Press <span style={{ color: 'var(--teal)' }}>▶</span> or <span style={{ color: 'var(--teal)' }}>&gt;</span> to begin the walkthrough
-                    </span>
-                  : currentStep?.explanation}
-              </p>
-            </div>
+              {frame.explanation ?? ''}
+            </p>
+          </div>
 
-            {/* Navigation controls */}
-            <div style={{
-              width: '100%', maxWidth: 720,
-              display: 'flex', alignItems: 'center', gap: '12px',
-              marginBottom: 32,
-            }}>
-              {/* Progress dots */}
-              <div style={{ display: 'flex', gap: '6px', flex: 1 }}>
-                {Array.from({ length: totalSteps + 1 }, (_, i) => (
-                  <button
-                    key={i}
-                    className="step-dot"
-                    data-active={i === currentStepIndex ? 'true' : undefined}
-                    data-visited={i < currentStepIndex ? 'true' : undefined}
-                    onClick={() => handleGoToStep(i)}
-                    title={i === 0 ? 'Initial state' : `Step ${i}`}
-                  />
-                ))}
-              </div>
+          {/* Playback controls */}
+          <div style={{ width: '100%', maxWidth: 900 }}>
+            <PlaybackControls
+              state={player.state}
+              onTogglePlay={player.togglePlay}
+              onNext={player.nextFrame}
+              onPrev={player.prevFrame}
+              onGoToFrame={player.goToFrame}
+              onSetSpeed={player.setSpeed}
+            />
+          </div>
 
-              {/* Play/speed */}
-              <button
-                onClick={handleTogglePlay}
-                className={`play-btn ${isPlaying ? 'playing' : ''}`}
-                title={isPlaying ? 'Pause' : 'Play'}
-              >
-                {isPlaying ? '⏸' : isLastStep ? '↻' : '▶'}
-              </button>
-              <button onClick={handleCycleSpeed} className="speed-btn" title="Speed">
-                {AUTO_PLAY_SPEEDS[speedIndex] / 1000}s
-              </button>
-
-              {/* < > navigation */}
-              <button onClick={handlePrev} disabled={isFirstStep} className="arrow-nav">
-                &lt;
-              </button>
-              <button onClick={handleNext} disabled={isLastStep} className="arrow-nav">
-                &gt;
-              </button>
-            </div>
-
-            {/* Code section (collapsible) */}
-            <div style={{ width: '100%', maxWidth: 720, marginBottom: 32 }}>
+          {/* Code section (after mode) — collapsible */}
+          {appState.plan.codePosition === 'after' && appState.plan.code && (
+            <div style={{ width: '100%', maxWidth: 900, marginTop: 24 }}>
               <button
                 onClick={() => setShowCode(!showCode)}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  fontSize: 22, fontWeight: 700, color: '#e2e8f0',
-                  fontFamily: 'Syne, sans-serif', letterSpacing: '-0.02em',
-                  padding: '12px 0', display: 'flex', alignItems: 'center', gap: 8,
+                  fontSize: 20, fontWeight: 700, color: '#e2e8f0',
+                  fontFamily: 'Syne, sans-serif', padding: '12px 0',
+                  display: 'flex', alignItems: 'center', gap: 8,
                 }}
               >
                 Code Implementation
                 <span style={{
-                  fontSize: 14, color: 'var(--text3)',
-                  transform: showCode ? 'rotate(180deg)' : 'rotate(0deg)',
-                  transition: 'transform 0.2s',
-                  display: 'inline-block',
+                  fontSize: 13, color: '#565f89',
+                  transform: showCode ? 'rotate(180deg)' : 'rotate(0)',
+                  transition: 'transform 0.2s', display: 'inline-block',
                 }}>▼</span>
               </button>
 
               {showCode && (
                 <div className="fade-in" style={{
-                  background: 'rgba(22, 20, 35, 0.9)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 12,
-                  padding: '20px 0',
-                  marginTop: 8,
+                  background: 'rgba(22,20,35,0.9)',
+                  border: '1px solid rgba(65,72,104,0.35)',
+                  borderRadius: 12, padding: '16px 0', marginTop: 8,
                 }}>
-                  {codeLines.map((line, i) => {
+                  {appState.plan.code.source.split('\n').map((line, i) => {
                     const ln = i + 1
-                    const isActive = activeLines.includes(ln)
                     return (
-                      <div key={ln} style={{
-                        display: 'flex', alignItems: 'stretch',
-                        background: isActive ? 'rgba(115,218,202,0.08)' : 'transparent',
-                        borderLeft: isActive ? '2px solid var(--teal)' : '2px solid transparent',
-                        transition: 'all 0.25s',
-                        padding: '0 20px',
-                      }}>
+                      <div key={ln} style={{ display: 'flex', padding: '0 20px' }}>
                         <span style={{
-                          width: 32, textAlign: 'right', paddingRight: 14,
-                          fontSize: 12, lineHeight: '1.85',
-                          color: isActive ? 'rgba(115,218,202,0.7)' : 'var(--text3)',
+                          width: 28, textAlign: 'right', paddingRight: 12,
+                          fontSize: 12, lineHeight: '1.85', color: '#3b4261',
                           fontFamily: 'JetBrains Mono, monospace',
                           userSelect: 'none', flexShrink: 0,
-                        }}>
-                          {ln}
-                        </span>
+                        }}>{ln}</span>
                         <span style={{
                           fontSize: 13, lineHeight: '1.85', whiteSpace: 'pre',
                           fontFamily: 'JetBrains Mono, monospace',
-                          fontWeight: isActive ? '700' : '400',
-                          color: isActive ? 'var(--teal2)' : undefined,
                         }}>
-                          {line.trim() ? (
-                            tokenizeLine(line, codeLanguage).map((t, idx) => (
-                              <span key={idx} style={{ color: isActive ? undefined : t.color }}>{t.text}</span>
-                            ))
-                          ) : '\u00A0'}
+                          {line.trim() ? tokenizeLine(line, appState.plan.code!.language).map((t, idx) => (
+                            <span key={idx} style={{ color: t.color }}>{t.text}</span>
+                          )) : '\u00A0'}
                         </span>
                       </div>
                     )
@@ -322,9 +462,29 @@ export default function App() {
                 </div>
               )}
             </div>
-          </div>
-        )}
-      </div>
-    </ErrorBoundary>
+          )}
+
+          {/* Insight / complexity note */}
+          {appState.plan.insightText && (
+            <div style={{
+              width: '100%', maxWidth: 900, marginTop: 20,
+              padding: '14px 20px', borderRadius: 10,
+              background: 'rgba(115,218,202,0.05)',
+              border: '1px solid rgba(115,218,202,0.12)',
+            }}>
+              <p style={{ fontSize: 12, color: '#73daca', fontFamily: 'JetBrains Mono, monospace', lineHeight: 1.7 }}>
+                💡 {appState.plan.insightText}
+                {appState.plan.complexityNote && (
+                  <span style={{ color: '#565f89' }}> — {appState.plan.complexityNote}</span>
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Keyframe animation */}
+      <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+    </div>
   )
 }
