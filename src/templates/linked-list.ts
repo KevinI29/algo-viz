@@ -137,8 +137,8 @@ export function mapLinkedListEvents(
       case 'll.pointer_off_end': {
         const ptr = pointers[event.name];
         if (ptr) {
-          ptr.targetIndex = values.length; // past end
-          ptr.visible = true; // still visible but pointing past
+          ptr.targetIndex = values.length;
+          ptr.visible = true;
 
           frames.push(snapshot(
             [{ type: 'pointer_off', pointerId: ptr.id }],
@@ -148,6 +148,30 @@ export function mapLinkedListEvents(
             }
           ));
         }
+        break;
+      }
+
+      case 'll.reverse_arrow': {
+        // Flip the arrow between fromIndex and toIndex
+        // Original: arrow_from_to (e.g., arrow_0_1 goes 0→1)
+        // After: arrow flips to point backwards (1←0)
+        const fwdId = `arrow_${event.fromIndex}_${event.fromIndex + 1}`;
+        const arrow = arrows[fwdId];
+        if (arrow) {
+          // Flip direction
+          const oldFrom = arrow.fromId;
+          arrow.fromId = arrow.toId;
+          arrow.toId = oldFrom;
+          arrow.opacity = 0.9; // make reversed arrows more visible
+        }
+
+        frames.push(snapshot(
+          [{ type: 'none' }],
+          {
+            duration: 500,
+            explanation: `Reverse link: node ${values[event.toIndex]} now points back to node ${values[event.fromIndex]}`,
+          }
+        ));
         break;
       }
 

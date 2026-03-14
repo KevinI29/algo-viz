@@ -1,8 +1,9 @@
 /**
- * Study AI — useAnimationPlayer Hook
- * =====================================
- * React hook that manages animation playback.
- * Handles play/pause/step/seek/speed with auto-advance via setInterval.
+ * Study AI — useAnimationPlayer Hook (Phase 5)
+ * ================================================
+ * Uses setTimeout per-frame instead of setInterval.
+ * Each frame gets its own duration (adjusted by speed), ensuring
+ * longer frames (like pass_done) actually hold longer.
  */
 
 import { useReducer, useRef, useEffect, useCallback } from 'react';
@@ -29,103 +30,85 @@ type UseAnimationPlayerReturn = {
 
 export function useAnimationPlayer(): UseAnimationPlayerReturn {
   const [state, dispatch] = useReducer(playerReducer, INITIAL_PLAYER_STATE);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Clear interval helper
-  const clearAutoPlay = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
+  const clearTimer = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
     }
   }, []);
 
-  // Next frame (used by auto-play)
-  const advanceFrame = useCallback(() => {
-    dispatch({ type: 'next_frame' });
-  }, []);
-
-  // Auto-play effect: start/stop interval based on mode + speed
+  // Schedule next frame advance based on CURRENT frame's duration
   useEffect(() => {
-    clearAutoPlay();
+    clearTimer();
 
     if (state.mode === 'playing' && state.timeline && state.currentFrame) {
-      // Duration for current frame, adjusted by speed
       const baseDuration = state.currentFrame.duration;
-      const adjustedDuration = Math.max(100, baseDuration / state.speed);
+      // Minimum 150ms so CSS transitions have time to complete
+      const adjustedDuration = Math.max(150, baseDuration / state.speed);
 
-      intervalRef.current = setInterval(() => {
-        advanceFrame();
+      timerRef.current = setTimeout(() => {
+        dispatch({ type: 'next_frame' });
       }, adjustedDuration);
     }
 
-    return clearAutoPlay;
-  }, [state.mode, state.speed, state.currentFrameIndex, clearAutoPlay, advanceFrame, state.timeline, state.currentFrame]);
+    return clearTimer;
+  }, [state.mode, state.speed, state.currentFrameIndex, clearTimer, state.timeline, state.currentFrame]);
 
-  // Stop auto-play when finished
+  // Stop when finished
   useEffect(() => {
-    if (state.mode === 'finished') {
-      clearAutoPlay();
-    }
-  }, [state.mode, clearAutoPlay]);
+    if (state.mode === 'finished') clearTimer();
+  }, [state.mode, clearTimer]);
 
   // ── Public API ──
 
   const load = useCallback((timeline: AnimationTimeline) => {
-    clearAutoPlay();
+    clearTimer();
     dispatch({ type: 'load', timeline });
-  }, [clearAutoPlay]);
+  }, [clearTimer]);
 
   const play = useCallback(() => {
     dispatch({ type: 'play' });
   }, []);
 
   const pause = useCallback(() => {
-    clearAutoPlay();
+    clearTimer();
     dispatch({ type: 'pause' });
-  }, [clearAutoPlay]);
+  }, [clearTimer]);
 
   const togglePlay = useCallback(() => {
-    if (state.mode === 'playing') {
-      clearAutoPlay();
-    }
+    if (state.mode === 'playing') clearTimer();
     dispatch({ type: 'toggle_play' });
-  }, [state.mode, clearAutoPlay]);
+  }, [state.mode, clearTimer]);
 
   const nextFrame = useCallback(() => {
-    clearAutoPlay();
+    clearTimer();
     dispatch({ type: 'pause' });
     dispatch({ type: 'next_frame' });
-  }, [clearAutoPlay]);
+  }, [clearTimer]);
 
   const prevFrame = useCallback(() => {
-    clearAutoPlay();
+    clearTimer();
     dispatch({ type: 'prev_frame' });
-  }, [clearAutoPlay]);
+  }, [clearTimer]);
 
   const goToFrame = useCallback((index: number) => {
-    clearAutoPlay();
+    clearTimer();
     dispatch({ type: 'go_to_frame', index });
-  }, [clearAutoPlay]);
+  }, [clearTimer]);
 
   const setSpeed = useCallback((speed: PlaybackSpeed) => {
     dispatch({ type: 'set_speed', speed });
   }, []);
 
   const reset = useCallback(() => {
-    clearAutoPlay();
+    clearTimer();
     dispatch({ type: 'reset' });
-  }, [clearAutoPlay]);
+  }, [clearTimer]);
 
   return {
-    state,
-    load,
-    play,
-    pause,
-    togglePlay,
-    nextFrame,
-    prevFrame,
-    goToFrame,
-    setSpeed,
-    reset,
+    state, load, play, pause, togglePlay,
+    nextFrame, prevFrame, goToFrame, setSpeed, reset,
   };
 }

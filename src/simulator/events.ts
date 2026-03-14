@@ -125,6 +125,12 @@ export type LLFoundResult = {
   value: number;
 };
 
+export type LLReverseArrow = {
+  type: 'll.reverse_arrow';
+  fromIndex: number;          // the arrow originally went fromIndex → toIndex
+  toIndex: number;            // now it should go toIndex → fromIndex
+};
+
 export type LLPointerOffEnd = {
   type: 'll.pointer_off_end';
   name: string;                // pointer that went past the last node
@@ -215,7 +221,7 @@ export type SimEvent =
   | TreeCheckChild | TreeDone
   // Linked List
   | LLMovePointer | LLHighlightNode | LLUnhighlightNode
-  | LLFoundResult | LLPointerOffEnd | LLDone
+  | LLFoundResult | LLReverseArrow | LLPointerOffEnd | LLDone
   // Stack
   | StackScan | StackPush | StackPop | StackMatch
   | StackNoMatch | StackResult | StackDone

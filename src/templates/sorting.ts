@@ -40,6 +40,7 @@ export function mapSortingEvents(
   events: SimEvent[],
   initialArray: number[],
   phaseExplanations?: Record<string, string>,
+  stagingLabel: string = 'temp',
 ): AnimationFrame[] {
   const frames: AnimationFrame[] = [];
   let seq = 0;
@@ -64,7 +65,7 @@ export function mapSortingEvents(
   const staging: StagingState = {
     entityType: 'staging',
     id: 'staging_temp',
-    label: 'temp',
+    label: stagingLabel,
     value: null,
     barColor: C_STAGING,
     visible: false,

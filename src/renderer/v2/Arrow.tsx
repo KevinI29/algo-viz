@@ -1,13 +1,15 @@
 /**
- * Study AI — Arrow Renderer (v2)
- * =================================
- * Directional arrow between two points.
+ * Study AI — Arrow Renderer (Phase 5)
+ * ======================================
+ * Directional arrow that smoothly animates when endpoints change.
  * Used for tree edges and linked list connections.
+ * When an arrow reverses (linked list reversal), endpoints swap
+ * and the CSS transition makes it rotate smoothly.
  */
 
 import type { ArrowState } from '../../templates/types';
 
-const T = 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)';
+const T = 'all 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
 
 type Props = {
   arrow: ArrowState;
@@ -17,22 +19,22 @@ type Props = {
 };
 
 export function Arrow({ arrow, x1, y1, x2, y2, nodeRadius = 28 }: Props) {
-  // Shorten line to stop at circle edge
+  // Shorten to stop at circle edges
   const dx = x2 - x1;
   const dy = y2 - y1;
   const dist = Math.sqrt(dx * dx + dy * dy) || 1;
   const ux = dx / dist;
   const uy = dy / dist;
 
-  const sx = x1 + ux * nodeRadius;
-  const sy = y1 + uy * nodeRadius;
-  const ex = x2 - ux * (nodeRadius + 6); // extra gap for arrowhead
-  const ey = y2 - uy * (nodeRadius + 6);
+  const sx = x1 + ux * (nodeRadius + 2);
+  const sy = y1 + uy * (nodeRadius + 2);
+  const ex = x2 - ux * (nodeRadius + 8);
+  const ey = y2 - uy * (nodeRadius + 8);
 
-  const markerId = `arrow-${arrow.id}`;
+  const markerId = `arr-${arrow.id}`;
 
   return (
-    <g style={{ transition: T, opacity: arrow.opacity }}>
+    <g style={{ opacity: arrow.opacity, transition: 'opacity 0.4s ease' }}>
       <defs>
         <marker
           id={markerId}
@@ -40,12 +42,12 @@ export function Arrow({ arrow, x1, y1, x2, y2, nodeRadius = 28 }: Props) {
           markerWidth="8" markerHeight="6"
           orient="auto-start-reverse"
         >
-          <path d="M 0 0 L 10 3 L 0 6 z" fill="rgba(192, 202, 245, 0.5)" />
+          <path d="M 0 0 L 10 3 L 0 6 z" fill="rgba(192,202,245,0.5)" />
         </marker>
       </defs>
       <line
         x1={sx} y1={sy} x2={ex} y2={ey}
-        stroke="rgba(192, 202, 245, 0.35)"
+        stroke="rgba(192,202,245,0.3)"
         strokeWidth={2}
         markerEnd={`url(#${markerId})`}
         style={{ transition: T }}

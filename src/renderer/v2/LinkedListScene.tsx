@@ -11,9 +11,9 @@ import { Arrow } from './Arrow';
 import { PointerLabel } from './PointerLabel';
 
 const CANVAS_W = 700;
-const CANVAS_H = 240;
-const NODE_Y = 150;
-const NODE_GAP = 100;
+const CANVAS_H = 260;
+const NODE_Y = 160;
+const NODE_GAP = 110;
 const LABEL_Y = 50;
 const ARROW_END_Y = NODE_Y - NODE_RADIUS - 8;
 
@@ -115,7 +115,7 @@ export function LinkedListScene({ frame }: Props) {
         />
       ))}
 
-      {/* Pointer labels — offset when multiple point at same node */}
+      {/* Pointer labels — offset when multiple point at same node, stagger heights */}
       {(() => {
         // Group pointers by target index to detect overlaps
         const groups: Record<number, typeof pointers> = {};
@@ -124,6 +124,15 @@ export function LinkedListScene({ frame }: Props) {
           if (!groups[idx]) groups[idx] = [];
           groups[idx].push(ptr);
         }
+
+        // Stagger Y positions by pointer name for visual clarity
+        const LABEL_Y_MAP: Record<string, number> = {
+          prev:    LABEL_Y - 10,   // higher
+          current: LABEL_Y + 16,   // lower (middle)
+          next:    LABEL_Y - 10,   // higher (same as prev, but different x)
+          slow:    LABEL_Y,
+          fast:    LABEL_Y,
+        };
 
         return pointers.map(ptr => {
           const targetIdx = ptr.targetIndex;
@@ -135,17 +144,19 @@ export function LinkedListScene({ frame }: Props) {
           const group = groups[targetIdx] ?? [ptr];
           const posInGroup = group.findIndex(p => p.id === ptr.id);
           const groupSize = group.length;
-          const LABEL_SPREAD = 62; // px between overlapping labels
+          const LABEL_SPREAD = 66;
           const xOffset = groupSize > 1
             ? (posInGroup - (groupSize - 1) / 2) * LABEL_SPREAD
             : 0;
+
+          const thisLabelY = LABEL_Y_MAP[ptr.name] ?? LABEL_Y;
 
           return (
             <PointerLabel
               key={ptr.id}
               pointer={ptr}
               x={baseX + xOffset}
-              labelY={LABEL_Y}
+              labelY={thisLabelY}
               arrowEndY={ARROW_END_Y}
             />
           );

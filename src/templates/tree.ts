@@ -25,8 +25,8 @@ const T_DONE      = 800;
 const T_PHASE     = 300;
 
 const C_UNVISITED   = '#7aa2f7';   // blue
-const C_PROCESSING  = '#f7768e';   // pink/salmon
-const C_VISITED     = '#9aa5ce';   // soft grey-blue (clearly different from both)
+const C_PROCESSING  = '#f7768e';   // pink/salmon (active highlight)
+const C_VISITED     = '#dbb6c1';   // warm muted pink (clearly visited)
 
 // ── Tree layout constants ──
 const TREE_ROOT_X = 220;

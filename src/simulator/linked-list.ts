@@ -79,15 +79,7 @@ export function* findMiddle(values: number[]): Generator<SimEvent> {
 
 /**
  * Iterative reversal using prev/current/next pointers.
- * Shows all three pointers moving step by step.
- *
- * Algorithm:
- *   prev = null, current = head
- *   while current:
- *     next = current.next
- *     current.next = prev   (reverse the link)
- *     prev = current        (advance prev)
- *     current = next        (advance current)
+ * Now emits ll.reverse_arrow events so arrows visually flip direction.
  */
 export function* reverseList(values: number[]): Generator<SimEvent> {
   const n = values.length;
@@ -97,52 +89,52 @@ export function* reverseList(values: number[]): Generator<SimEvent> {
           explanation: `Reverse [${values.join(' → ')}] using prev, current, and next pointers` };
   yield { type: 'phase.end', name: 'setup' };
 
-  let prev = -1;    // starts as null (off-screen)
+  let prev = -1;
   let current = 0;
 
   yield { type: 'phase.start', name: 'reverse',
-          explanation: 'For each node: save next, reverse the link to point back, then advance' };
+          explanation: 'For each node: save next, reverse the link, then advance pointers' };
 
   for (let step = 0; step < n; step++) {
     const next = current + 1 < n ? current + 1 : -1;
 
-    // Highlight current node being processed
+    // Highlight current node
     yield { type: 'll.highlight_node', index: current, color: '#ff9e64' };
 
-    // Step 1: save next
+    // Step 1: save next pointer
     if (next >= 0) {
       yield { type: 'll.move_pointer', name: 'next', fromIndex: next, toIndex: next };
     }
 
-    // Step 2: reverse the link — current.next = prev
-    // (Visually: node gets highlighted to show it's been reversed)
+    // Step 2: REVERSE THE LINK — current.next = prev
+    // This is the key visual: the arrow flips direction
+    if (prev >= 0) {
+      yield { type: 'll.reverse_arrow', fromIndex: prev, toIndex: current };
+    }
     yield { type: 'll.highlight_node', index: current, color: '#73daca' };
 
-    // Step 3: prev = current (move prev pointer forward)
+    // Step 3: advance prev = current
     if (prev >= 0) {
       yield { type: 'll.unhighlight_node', index: prev };
     }
     yield { type: 'll.move_pointer', name: 'prev',
-            fromIndex: prev >= 0 ? prev : 0,
-            toIndex: current };
+            fromIndex: prev >= 0 ? prev : 0, toIndex: current };
 
-    // Step 4: current = next (move current pointer forward)
+    // Step 4: advance current = next
     prev = current;
-
     if (next >= 0) {
       yield { type: 'll.move_pointer', name: 'current',
               fromIndex: current, toIndex: next };
       current = next;
     } else {
-      // current goes off end — we're done
       yield { type: 'll.pointer_off_end', name: 'current' };
+      yield { type: 'll.pointer_off_end', name: 'next' };
       break;
     }
   }
 
   yield { type: 'phase.end', name: 'reverse' };
 
-  // Highlight the new head (was the last node)
   yield { type: 'll.highlight_node', index: n - 1, color: '#9ece6a' };
   yield { type: 'll.found_result', index: n - 1, value: values[n - 1] };
   yield { type: 'll.done' };

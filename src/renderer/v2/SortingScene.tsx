@@ -1,8 +1,10 @@
 /**
- * Study AI — Sorting Scene (v2 fixed)
+ * Study AI — Sorting Scene (Phase 5)
  * =====================================
- * Renders sorting template: bars + staging area.
- * Uses bar.isStaged flag to properly hide bars when they're in staging.
+ * Computes target pixel positions for each bar.
+ * When isStaged, target moves to staging area center.
+ * When in array, target is the slot position.
+ * Bar component animates between positions via CSS transform.
  */
 
 import type { AnimationFrame, BarState, StagingState } from '../../templates/types';
@@ -13,8 +15,9 @@ const CANVAS_W = 700;
 const CANVAS_H = 300;
 const SLOT_GAP = 12;
 const STAGING_X = 16;
-const BASE_Y = 240;
-const STAGING_Y = BASE_Y - AREA_H;
+const BASE_Y = 240;                       // array baseline
+const STAGING_Y = BASE_Y - AREA_H;        // staging container top
+const STAGING_BASE_Y = BASE_Y - 20;       // baseline inside staging area
 
 type Props = {
   frame: AnimationFrame;
@@ -23,7 +26,6 @@ type Props = {
 export function SortingScene({ frame }: Props) {
   const entities = frame.entities;
 
-  // Extract bars and staging
   const bars = Object.values(entities).filter(
     (e): e is BarState => e.entityType === 'bar'
   ).sort((a, b) => a.index - b.index);
@@ -34,15 +36,17 @@ export function SortingScene({ frame }: Props) {
 
   const maxValue = bars.reduce((max, b) => Math.max(max, b.value), 1);
 
-  // Calculate bar positions — offset to the right to leave room for staging
-  const barAreaStartX = STAGING_X + AREA_W + 40;
-  const activeBars = bars.filter(b => !b.isStaged);
+  // Array slot positions
+  const barAreaStartX = STAGING_X + AREA_W + 50;
   const totalBarWidth = bars.length * (BAR_W + SLOT_GAP) - SLOT_GAP;
   const barStartX = barAreaStartX + (CANVAS_W - barAreaStartX - totalBarWidth) / 2;
 
-  function slotX(index: number): number {
+  function slotCenterX(index: number): number {
     return barStartX + index * (BAR_W + SLOT_GAP) + BAR_W / 2;
   }
+
+  // Staging area center
+  const stagingCenterX = STAGING_X + AREA_W / 2;
 
   return (
     <svg
@@ -59,26 +63,36 @@ export function SortingScene({ frame }: Props) {
       <rect width={CANVAS_W} height={CANVAS_H} fill="#1a1b26" />
       <rect width={CANVAS_W} height={CANVAS_H} fill="url(#sort-grid)" />
 
-      {/* Staging area */}
+      {/* Staging area container (just the outline + label) */}
       {staging && (
         <StagingArea
           staging={staging}
           x={STAGING_X}
           y={STAGING_Y}
-          maxValue={maxValue}
         />
       )}
 
-      {/* Bars — staged bars rendered as ghost (low opacity) at their slot */}
-      {bars.map(bar => (
-        <Bar
-          key={bar.id}
-          bar={bar}
-          maxValue={maxValue}
-          slotX={slotX}
-          isInStaging={bar.isStaged}
-        />
-      ))}
+      {/* Bars — each gets a computed target position */}
+      {bars.map(bar => {
+        const isStaged = bar.isStaged;
+
+        // Target position: staging area or array slot
+        const targetX = isStaged ? stagingCenterX : slotCenterX(bar.index);
+        const targetY = isStaged ? STAGING_BASE_Y : BASE_Y;
+
+        return (
+          <Bar
+            key={bar.id}
+            bar={bar}
+            maxValue={maxValue}
+            targetX={targetX}
+            targetY={targetY}
+            isStaged={isStaged}
+            slotX={slotCenterX(bar.index)}
+            slotBaseY={BASE_Y}
+          />
+        );
+      })}
     </svg>
   );
 }

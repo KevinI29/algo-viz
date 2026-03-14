@@ -52,7 +52,9 @@ function mapEvents(plan: LessonPlan, events: SimEvent[]): AnimationFrame[] {
   switch (plan.visualTemplate) {
     case 'sorting': {
       const data = plan.exampleData as SortingData;
-      return mapSortingEvents(events, data.array, plan.phaseExplanations);
+      // Derive staging label from simulator — insertion sort uses "key", others use "temp"
+      const stagingLabel = plan.simulator?.includes('insertion') ? 'key' : 'temp';
+      return mapSortingEvents(events, data.array, plan.phaseExplanations, stagingLabel);
     }
 
     case 'tree': {

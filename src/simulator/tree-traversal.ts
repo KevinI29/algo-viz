@@ -73,21 +73,35 @@ export function* dfsPreorder(root: TreeNodeData): Generator<SimEvent> {
 
   yield { type: 'phase.start', name: 'init',
           explanation: `Start DFS pre-order from root node ${root.value}` };
+  yield { type: 'tree.enqueue', nodeId: root.id, value: root.value };
 
   while (stack.length > 0) {
     const node = stack.pop()!;
 
+    // Dequeue triggers the pink highlight in the template mapper
+    yield { type: 'tree.dequeue', nodeId: node.id, value: node.value };
     yield { type: 'tree.visit', nodeId: node.id, value: node.value };
     yield { type: 'tree.add_result', value: node.value };
 
-    // Push right first so left is processed first (stack is LIFO)
+    // Check children — push right first so left is processed first (LIFO)
     if (node.right) {
+      yield { type: 'tree.check_child', parentId: node.id,
+              childId: node.right.id, side: 'right', value: node.right.value };
       stack.push(node.right);
       yield { type: 'tree.enqueue', nodeId: node.right.id, value: node.right.value };
+    } else {
+      yield { type: 'tree.check_child', parentId: node.id,
+              childId: null, side: 'right' };
     }
+
     if (node.left) {
+      yield { type: 'tree.check_child', parentId: node.id,
+              childId: node.left.id, side: 'left', value: node.left.value };
       stack.push(node.left);
       yield { type: 'tree.enqueue', nodeId: node.left.id, value: node.left.value };
+    } else {
+      yield { type: 'tree.check_child', parentId: node.id,
+              childId: null, side: 'left' };
     }
   }
 
@@ -108,6 +122,8 @@ export function* dfsInorder(root: TreeNodeData): Generator<SimEvent> {
 
     yield* walk(node.left);
 
+    // Dequeue triggers pink highlight, visit transitions to visited grey
+    yield { type: 'tree.dequeue', nodeId: node.id, value: node.value };
     yield { type: 'tree.visit', nodeId: node.id, value: node.value };
     yield { type: 'tree.add_result', value: node.value };
 
