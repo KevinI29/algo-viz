@@ -23,6 +23,11 @@ export type ProviderResponse = {
   provider: string;
 };
 
+export type CompleteOptions = {
+  /** Aborts the upstream request, e.g. when the HTTP client disconnects. */
+  signal?: AbortSignal;
+};
+
 export interface AIProvider {
   /**
    * The provider name — used for logging and error messages.
@@ -40,5 +45,5 @@ export interface AIProvider {
    * Send a message sequence to the LLM and return the text response.
    * All providers normalize to this single method.
    */
-  complete(messages: ProviderMessage[]): Promise<ProviderResponse>;
+  complete(messages: ProviderMessage[], options?: CompleteOptions): Promise<ProviderResponse>;
 }

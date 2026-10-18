@@ -56,6 +56,7 @@ export async function generateLessonPlan(
   provider: AIProvider,
   userInput: string,
   inputType: 'concept' | 'code',
+  signal?: AbortSignal,
 ): Promise<GenerateResult> {
   const { system, user } = buildTeachPrompt(userInput, inputType);
   const messages: ProviderMessage[] = [
@@ -63,7 +64,7 @@ export async function generateLessonPlan(
     { role: 'user', content: user },
   ];
 
-  const first = await provider.complete(messages);
+  const first = await provider.complete(messages, { signal });
   const firstAttempt = parseResponse(first.text);
   if (firstAttempt.ok) return { ...firstAttempt, attempts: 1 };
 
@@ -81,7 +82,7 @@ export async function generateLessonPlan(
         'Fix these problems and return ONLY the corrected raw JSON object. ' +
         'Start with { and end with }. No markdown wrapping.',
     },
-  ]);
+  ], { signal });
   const retryAttempt = parseResponse(retry.text);
   if (retryAttempt.ok) return { ...retryAttempt, attempts: 2 };
 

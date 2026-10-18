@@ -4,21 +4,19 @@
  * Secure proxy between the frontend and AI providers.
  * API keys never touch the browser.
  *
- * Routes:
- *   POST /api/teach      — Generate a LessonPlan for a concept or pasted code
- *   GET  /api/health     — Health check
+ * This file reads configuration, creates the provider and starts listening.
+ * Routes live in app.ts.
  */
 
-import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
+import { fileURLToPath } from 'url';
 import { OpenAIProvider }    from './providers/openai';
-import { AnthropicProvider } from './providers/anthropic';
+import { AnthropicProvider, DEFAULT_ANTHROPIC_MODEL } from './providers/anthropic';
 import type { AIProvider }   from './providers/types';
-import { generateLessonPlan } from './teach';
-import path from 'path';
+import { createApp, DEFAULT_APP_CONFIG } from './app';
 
-dotenv.config({ path: path.resolve(process.cwd(), '.env') });
+// Resolve .env at the repo root relative to this file, so it works from any cwd
+dotenv.config({ path: fileURLToPath(new URL('../.env', import.meta.url)) });
 
 // =============================================================================
 // PROVIDER FACTORY
@@ -26,7 +24,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env') });
 // =============================================================================
 
 function createProvider(): AIProvider {
-  const providerName = process.env.AI_PROVIDER ?? 'openai';
+  const providerName = process.env.AI_PROVIDER ?? 'anthropic';
 
   switch (providerName) {
     case 'openai': {
@@ -40,30 +38,27 @@ function createProvider(): AIProvider {
     case 'anthropic': {
       const key = process.env.ANTHROPIC_API_KEY;
       if (!key) throw new Error('ANTHROPIC_API_KEY is not set in .env');
-      const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-4-20250514';
+      const model = process.env.ANTHROPIC_MODEL ?? DEFAULT_ANTHROPIC_MODEL;
       console.log(`[Provider] Using Anthropic — model: ${model}`);
       return new AnthropicProvider(key, model);
     }
 
     default:
       throw new Error(
-        `Unknown AI_PROVIDER: "${providerName}". Valid options: openai, anthropic`
+        `Unknown AI_PROVIDER: "${providerName}". Valid options: anthropic, openai`
       );
   }
 }
 
+function intFromEnv(name: string, fallback: number): number {
+  const value = Number(process.env[name]);
+  return Number.isInteger(value) && value > 0 ? value : fallback;
+}
+
 // =============================================================================
-// SERVER SETUP
+// START
 // =============================================================================
 
-const app  = express();
-const port = process.env.PORT ?? 3001;
-
-const corsOrigin = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
-app.use(cors({ origin: corsOrigin }));
-app.use(express.json());
-
-// Initialize provider once at startup
 let provider: AIProvider;
 try {
   provider = createProvider();
@@ -72,70 +67,18 @@ try {
   process.exit(1);
 }
 
-// =============================================================================
-// ROUTES
-// =============================================================================
-
-/**
- * GET /api/health
- * Quick check that the server is running and which provider is active.
- */
-app.get('/api/health', (_req, res) => {
-  res.json({
-    status: 'ok',
-    provider: provider.name,
-    model: provider.model,
-  });
+const app = createApp(provider, {
+  corsOrigin: process.env.CORS_ORIGIN ?? DEFAULT_APP_CONFIG.corsOrigin,
+  rateLimitMax: intFromEnv('RATE_LIMIT_MAX', DEFAULT_APP_CONFIG.rateLimitMax),
+  rateLimitWindowMs: intFromEnv('RATE_LIMIT_WINDOW_MS', DEFAULT_APP_CONFIG.rateLimitWindowMs),
 });
 
-// =============================================================================
-// POST /api/teach
-// =============================================================================
+const port = intFromEnv('PORT', 3001);
+const host = process.env.HOST ?? '127.0.0.1';
 
-/**
- * POST /api/teach
- * Body: { userInput: string, inputType: 'concept' | 'code' }
- *
- * Returns a LessonPlan JSON that the frontend uses to:
- * 1. Select a simulator (or fall back to Pyodide)
- * 2. Render the animation with the right visual template
- * 3. Display code and explanations
- */
-app.post('/api/teach', async (req, res) => {
-  try {
-    const { userInput, inputType } = (req.body ?? {}) as { userInput?: unknown; inputType?: unknown };
-
-    if (!userInput || typeof userInput !== 'string' || !userInput.trim()) {
-      return res.status(400).json({ error: 'userInput is required' });
-    }
-
-    const cleanInput = userInput.trim();
-    const type = inputType === 'code' ? 'code' : 'concept';
-    console.log(`
-[Teach] Input: "${cleanInput.slice(0, 80)}..." (${type})`);
-
-    const result = await generateLessonPlan(provider, cleanInput, type);
-    if (!result.ok) {
-      return res.status(502).json({ error: 'The AI returned an invalid lesson plan. Please try again.' });
-    }
-
-    const { plan } = result;
-    console.log(`[Teach] ✅ Lesson plan: ${plan.concept} | simulator=${plan.simulator} | template=${plan.visualTemplate} | attempts=${result.attempts}`);
-    return res.json(plan);
-
-  } catch (err) {
-    console.error('[Teach] Error:', err);
-    return res.status(500).json({ error: 'Something went wrong generating the lesson. Please try again.' });
-  }
-});
-
-// =============================================================================
-// START
-// =============================================================================
-
-app.listen(port, () => {
-  console.log(`\n🚀 algo.viz backend running on http://localhost:${port}`);
+app.listen(port, host, () => {
+  console.log(`\n🚀 algo.viz backend running on http://${host}:${port}`);
   console.log(`   Provider : ${provider.name}`);
   console.log(`   Model    : ${provider.model}`);
-  console.log(`   Health   : http://localhost:${port}/api/health\n`);
+  console.log(`   Health   : http://${host}:${port}/api/health\n`);
 });

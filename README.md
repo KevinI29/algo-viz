@@ -4,7 +4,7 @@ A visual learning platform for data structures and algorithms. Type a concept, s
 
 An LLM acts as the **teacher**. It picks the algorithm, chooses example data that teaches well, and writes the explanations. Deterministic TypeScript **simulators** are the engine. They produce every animation frame, so what you see is always what the algorithm actually does.
 
-> **Status: work in progress.** The build, typecheck, lint and tests are green as of Milestone 1. Milestones 2–5 of the [fix plan](docs/fix-plan/00-index.md) harden validation and fix lesson bugs. See the [audit](docs/audit/00-summary.md) for the full picture.
+> **Status: work in progress.** Milestones 1–2 are done: the build, typecheck, lint and tests are green, lesson plans are schema-validated, and the backend is rate-limited. Milestones 3–5 of the [fix plan](docs/fix-plan/00-index.md) fix lesson bugs and add the Pyodide path. See the [audit](docs/audit/00-summary.md) for the full picture.
 
 ---
 
@@ -54,6 +54,8 @@ Not yet built: graph algorithms, queue lessons, quick and merge sort, and the pl
 
 The LLM sits behind a small provider interface (`backend/providers/types.ts`), with Anthropic and OpenAI implementations. API keys stay on the server; the browser only talks to the local backend.
 
+Every lesson plan is validated by one shared zod schema (`src/lesson/schema.ts`), on the server before replying and in the browser before anything runs. Example data is size-capped, and the visual template is derived from the simulator rather than trusted from the LLM. An invalid plan gets one corrective retry, then a friendly error.
+
 ---
 
 ## Tech stack
@@ -73,26 +75,29 @@ The LLM sits behind a small provider interface (`backend/providers/types.ts`), w
 npm ci
 ```
 
-Create a `.env` file in the **repo root** (it is git-ignored):
+Copy `.env.example` to `.env` in the **repo root** (`.env` is git-ignored) and add your key:
 
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
-| `AI_PROVIDER` | no | `openai` | `anthropic` or `openai` |
+| `AI_PROVIDER` | no | `anthropic` | `anthropic` or `openai` |
 | `ANTHROPIC_API_KEY` | if provider is `anthropic` | — | Anthropic API key |
-| `ANTHROPIC_MODEL` | no | `claude-sonnet-4-20250514` | Model id |
+| `ANTHROPIC_MODEL` | no | `claude-opus-5-5` | Model id |
 | `OPENAI_API_KEY` | if provider is `openai` | — | OpenAI API key |
 | `OPENAI_MODEL` | no | `gpt-4o` | Model id |
 | `PORT` | no | `3001` | Backend port |
+| `HOST` | no | `127.0.0.1` | Bind address (localhost only by default) |
 | `CORS_ORIGIN` | no | `http://localhost:5173` | Allowed frontend origin |
+| `RATE_LIMIT_MAX` | no | `20` | `/api/teach` requests per IP per window |
+| `RATE_LIMIT_WINDOW_MS` | no | `600000` | Rate-limit window (10 minutes) |
 
-Run the backend and the frontend in two terminals, both from the repo root:
+Run the backend and the frontend in two terminals:
 
 ```bash
-npm run backend   # http://localhost:3001  (health check: /api/health)
+npm run backend   # http://127.0.0.1:3001  (health check: /api/health)
 npm run dev       # http://localhost:5173
 ```
 
-The frontend calls `http://localhost:3001`, which is hardcoded in `src/api/teach.ts`.
+The frontend calls `http://127.0.0.1:3001`, which is hardcoded in `src/api/teach.ts`. The backend finds `.env` relative to its own file, so it can be started from any directory.
 
 ---
 
@@ -106,7 +111,7 @@ The frontend calls `http://localhost:3001`, which is hardcoded in `src/api/teach
 | `npm run typecheck` | `tsc -b` (app, Vite config and tests) | ✅ |
 | `npm run typecheck:backend` | `tsc -p backend/tsconfig.json` | ✅ |
 | `npm run lint` | ESLint | ✅ |
-| `npm test` | Vitest (`src/**/*.test.ts`) | ✅ 62 tests |
+| `npm test` | Vitest (`src/**/*.test.ts`, `backend/**/*.test.ts`) | ✅ 134 tests |
 | `npm run preview` | Serve the production build | works after `build` |
 
 ---
@@ -115,12 +120,16 @@ The frontend calls `http://localhost:3001`, which is hardcoded in `src/api/teach
 
 ```
 backend/
-  server.ts              Express app: /api/health, /api/teach
+  server.ts              reads config, creates the provider, starts listening
+  app.ts                 Express app: /api/health, /api/teach, rate limit, JSON errors
+  teach.ts               prompt → LLM → validated LessonPlan (one corrective retry)
   prompts/teacher.ts     LLM "teacher" prompt → LessonPlan
   providers/             AIProvider interface + Anthropic / OpenAI implementations
 src/
   App.tsx                the whole live UI: input, loading, lesson view, code panel
   api/teach.ts           client for /api/teach
+  lesson/schema.ts       shared zod validation + size caps for lesson plans
+  lesson/catalog.ts      simulator → data type + visual template
   router/types.ts        LessonPlan, VisualTemplate, SimulatorId and example-data types
   router/classify.ts     "is this code?" heuristic
   simulator/             deterministic algorithm generators → SimEvent
@@ -129,7 +138,7 @@ src/
   renderer/v2/           SVG scenes: Sorting, Tree, LinkedList, Stack (+ Bar, Node, Arrow, …)
   sandbox/               Pyodide tracer draft (not wired)
   lib/syntaxHighlighter.ts
-  components/            ErrorBoundary (to be mounted in Milestone 2)
+  components/            ErrorBoundary (mounted by Root.tsx; reset remounts the app)
 docs/
   audit/                 codebase audit (2026-10-18)
   fix-plan/              milestone-based session prompts to fix it
@@ -143,15 +152,14 @@ docs/
 2. **Simulator.** Write a generator `function* myAlgo(input): Generator<SimEvent>` in `src/simulator/`, and register it in `src/simulator/registry.ts` with a `name` and `dataType`.
 3. **Mapper.** Handle the new events in the matching `src/templates/*.ts` mapper. A new visual template needs a new mapper plus a case in `src/templates/registry.ts`.
 4. **Scene.** For a new template, add a scene in `src/renderer/v2/` and a case in `renderer/v2/SceneRenderer.tsx`.
-5. **Teach the teacher.** Add the simulator id and data shape to the table in `backend/prompts/teacher.ts`.
+5. **Teach the teacher.** Add the simulator id to `SimulatorId` (`src/router/types.ts`) and `SIMULATOR_CATALOG` (`src/lesson/catalog.ts`), extend the schema if it needs a new data type, and add it to the table in `backend/prompts/teacher.ts`.
 6. **Test.** Add Vitest specs next to the code (`src/simulator/simulators.test.ts`, `src/templates/templates.test.ts`), and run `npm test`.
 
 ---
 
 ## Known limitations
 
-- The LLM's lesson plan is barely validated, and no error boundary is mounted, so an unusual plan can blank the screen.
-- The backend has no rate limit or input cap. Keep it on localhost.
+- There is no authentication. The backend binds to localhost and is rate-limited, but don't expose it publicly.
 - Canvases are a fixed 700 px wide, so large inputs overflow.
 - Code highlighting assumes canonical code but displays LLM-written code, so highlighted lines can drift.
 - The input box is single-line, so pasted multi-line code loses its newlines.
@@ -163,7 +171,7 @@ Every item is tracked, with file and line references, in [docs/audit/04-issues-a
 The fix plan has five milestones, each run as self-contained Claude Code session prompts. See [docs/fix-plan/00-index.md](docs/fix-plan/00-index.md).
 
 1. ✅ **Stable foundation:** commit the baseline, remove legacy code, get the build green, adopt Vitest.
-2. **Trustworthy pipeline:** zod-validated lesson plans, error boundaries, rate limiting, Anthropic as the default provider.
+2. ✅ **Trustworthy pipeline:** zod-validated lesson plans, error boundaries, rate limiting, Anthropic as the default provider.
 3. **Correct lessons:** fix the simulator and mapper bugs, ship canonical code with exact line maps, auto-fit the canvases.
 4. **Second execution path:** Pyodide in a killable Web Worker, a trace template, pasted Python animated through the same renderer.
 5. **Release check:** clean-clone verification and refreshed docs.

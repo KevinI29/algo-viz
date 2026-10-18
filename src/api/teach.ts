@@ -7,7 +7,7 @@
 import type { LessonPlan } from '../router/types';
 import { parseLessonPlan } from '../lesson/schema';
 
-const BACKEND_URL = 'http://localhost:3001';
+const BACKEND_URL = 'http://127.0.0.1:3001';  // backend binds 127.0.0.1 by default
 const TIMEOUT_MS = 45_000;
 
 // =============================================================================
