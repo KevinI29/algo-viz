@@ -8,7 +8,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { fetchLessonPlan } from './api/teach'
-import { looksLikeCode, detectLanguage } from './router/classify'
+import { looksLikeCode } from './router/classify'
 import { runLessonPlan } from './simulator/runner'
 import { compileTimeline } from './templates/registry'
 import { useAnimationPlayer } from './engine/useAnimationPlayer'
@@ -39,8 +39,6 @@ const SUGGESTIONS = [
   'Find middle of linked list', 'Valid Parentheses',
   'Selection Sort', 'DFS pre-order', 'Reverse a linked list',
 ]
-
-const CATEGORIES = ['Sorting', 'Trees', 'Linked Lists', 'Stacks']
 
 // =============================================================================
 // APP COMPONENT
