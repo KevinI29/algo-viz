@@ -24,7 +24,7 @@ import { buildTeachPrompt } from './prompts/teacher';
 import { validateIRDocument } from './validator';
 import path from 'path';
 
-dotenv.config({ path: path.resolve(process.cwd(), '..', '.env') });// =============================================================================
+dotenv.config({ path: path.resolve(process.cwd(), '.env') });// =============================================================================
 // JSON EXTRACTION
 // LLMs sometimes wrap JSON in markdown code blocks — strip them before parsing.
 // =============================================================================

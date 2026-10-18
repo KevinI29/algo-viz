@@ -11,6 +11,7 @@
     "backend": "npx tsx backend/server.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.131.0",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
@@ -38,5 +39,4 @@
   "overrides": {
     "vite": "^8.0.0-beta.13"
   }
-  
 }

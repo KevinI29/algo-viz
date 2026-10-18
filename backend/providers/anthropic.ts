@@ -40,15 +40,16 @@ export class AnthropicProvider implements AIProvider {
 
     const response = await client.messages.create({
       model: this.model,
-      max_tokens: 8192,
-      temperature: 0.2,         // Low temperature for structured, consistent output
+      max_tokens: 8192,        // Low temperature for structured, consistent output
       system: systemMessage,
       messages: userMessages,
     });
 
-    const text = response.content[0]?.type === 'text'
-      ? response.content[0].text
-      : '';
+    // Newer models may emit a "thinking" block before the answer, so
+    // content[0] isn't always the text. Join all text blocks instead.
+    const text = response.content
+      .flatMap(block => (block.type === 'text' ? [block.text] : []))
+      .join('');
 
     return {
       text,
