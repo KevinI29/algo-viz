@@ -156,8 +156,8 @@ app.post('/api/teach', async (req, res) => {
       }
     }
 
-    // Basic validation
-    const plan = lessonPlan as any;
+    // Basic validation (full schema validation arrives in M2)
+    const plan = (lessonPlan ?? {}) as Record<string, unknown>;
     if (!plan.concept || !plan.visualTemplate) {
       return res.status(500).json({ error: 'AI returned incomplete lesson plan' });
     }

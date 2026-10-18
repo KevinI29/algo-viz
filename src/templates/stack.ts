@@ -161,8 +161,8 @@ export function mapStackEvents(
 
       case 'example.start': {
         // Reset for new example
-        const newData = event.data as any;
-        const newInput: string = newData?.input ?? input;
+        const newData = event.data;
+        const newInput: string = newData.type === 'stack' ? newData.input : input;
         stringDisplay.chars = newInput.split('');
         stringDisplay.scanIndex = -1;
         stringDisplay.matchedIndices = [];

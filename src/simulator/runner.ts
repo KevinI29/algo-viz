@@ -6,8 +6,8 @@
  */
 
 import type { SimEvent } from './events';
-import type { LessonPlan } from '../router/types';
-import { getSimulator } from './registry';
+import type { ExampleData, LessonPlan } from '../router/types';
+import { getSimulator, runEntry } from './registry';
 
 // =============================================================================
 // CORE RUNNER
@@ -32,7 +32,7 @@ export function collectEvents(gen: Generator<SimEvent>): SimEvent[] {
  */
 export function runSimulator(
   simulatorName: string,
-  data: any,
+  data: ExampleData,
 ): SimEvent[] | null {
   const sim = getSimulator(simulatorName);
   if (!sim) {
@@ -46,7 +46,7 @@ export function runSimulator(
   }
 
   try {
-    const gen = sim.run(data);
+    const gen = runEntry(sim, data);
     return collectEvents(gen);
   } catch (err) {
     console.error(`[Runner] Simulator crashed:`, err);

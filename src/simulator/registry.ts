@@ -7,6 +7,7 @@
 
 import type { SimEvent } from './events';
 import type {
+  DataType, ExampleData, SimulatorId,
   SortingData, TreeData, LinkedListData, StackData,
 } from '../router/types';
 import { bubbleSort, insertionSort, selectionSort } from './sorting';
@@ -18,17 +19,21 @@ import { validParentheses, evaluatePostfix } from './stack-queue';
 // REGISTRY TYPE
 // =============================================================================
 
-type SimulatorEntry = {
+type DataFor<T extends DataType> = Extract<ExampleData, { type: T }>;
+
+type TypedEntry<T extends DataType> = {
   name: string;
-  dataType: string;                           // must match exampleData.type
-  run: (data: any) => Generator<SimEvent>;    // generator factory
+  dataType: T;                                     // must match exampleData.type
+  run: (data: DataFor<T>) => Generator<SimEvent>;  // generator factory
 };
+
+export type SimulatorEntry = { [T in DataType]: TypedEntry<T> }[DataType];
 
 // =============================================================================
 // THE REGISTRY
 // =============================================================================
 
-const registry: Record<string, SimulatorEntry> = {
+const registry: Record<SimulatorId, SimulatorEntry> = {
   // Sorting
   'sorting.bubble': {
     name: 'Bubble Sort',
@@ -102,14 +107,26 @@ const registry: Record<string, SimulatorEntry> = {
  * Returns null if not found.
  */
 export function getSimulator(name: string): SimulatorEntry | null {
-  return registry[name] ?? null;
+  return hasSimulator(name) ? registry[name] : null;
 }
 
 /**
  * Check if a simulator exists for a given name.
+ * Uses an own-property check so prototype keys like "toString" don't match.
  */
-export function hasSimulator(name: string): boolean {
-  return name in registry;
+export function hasSimulator(name: string): name is SimulatorId {
+  return Object.hasOwn(registry, name);
+}
+
+/**
+ * Run a simulator on data whose type has already been checked against
+ * entry.dataType. TypeScript can't correlate the two unions, hence the cast.
+ */
+export function runEntry(entry: SimulatorEntry, data: ExampleData): Generator<SimEvent> {
+  if (data.type !== entry.dataType) {
+    throw new Error(`Data type mismatch: expected ${entry.dataType}, got ${data.type}`);
+  }
+  return (entry.run as (d: ExampleData) => Generator<SimEvent>)(data);
 }
 
 /**

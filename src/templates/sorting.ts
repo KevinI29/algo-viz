@@ -257,8 +257,8 @@ export function mapSortingEvents(
 
       case 'example.start':
         // Reset bars for new example
-        if ('array' in (event.data as any)) {
-          const arr = (event.data as any).array as number[];
+        if (event.data.type === 'sorting') {
+          const arr = event.data.array;
           for (const key of Object.keys(bars)) delete bars[key];
           for (let i = 0; i < arr.length; i++) {
             bars[`bar_${i}`] = {

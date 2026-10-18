@@ -81,7 +81,7 @@ export default function App() {
     const plan = result.plan
 
     // Text-only response?
-    if ((plan as any).textOnly || plan.codePosition === 'none') {
+    if (plan.textOnly || plan.codePosition === 'none') {
       setAppState({ status: 'text', plan })
       return
     }

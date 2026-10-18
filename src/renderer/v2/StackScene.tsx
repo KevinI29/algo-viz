@@ -7,7 +7,7 @@
 
 import type { AnimationFrame, StringDisplayState, StackContainerState } from '../../templates/types';
 import { StringDisplay } from './StringDisplay';
-import { StackContainer, CONTAINER_W, CONTAINER_H } from './StackContainer';
+import { StackContainer } from './StackContainer';
 
 const CANVAS_W = 700;
 const CANVAS_H = 300;

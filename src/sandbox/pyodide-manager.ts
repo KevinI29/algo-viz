@@ -36,11 +36,29 @@ export type ExecutionResult = {
 };
 
 // =============================================================================
+// PYODIDE SURFACE — the small part of the Pyodide API this module uses
+// =============================================================================
+
+const PYODIDE_BASE_URL = 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/';
+
+type PyProxy = {
+  toJs(options: { dict_converter: typeof Object.fromEntries }): unknown;
+};
+
+type PyodideInstance = {
+  runPythonAsync(code: string): Promise<PyProxy>;
+};
+
+type PyodideModule = {
+  loadPyodide(options: { indexURL: string }): Promise<PyodideInstance>;
+};
+
+// =============================================================================
 // PYODIDE MANAGER
 // =============================================================================
 
 class PyodideManager {
-  private pyodide: any = null;
+  private pyodide: PyodideInstance | null = null;
   private loadPromise: Promise<void> | null = null;
   private _ready = false;
 
@@ -59,12 +77,10 @@ class PyodideManager {
   private async init(): Promise<void> {
     try {
       // Dynamic import — Pyodide is loaded from CDN
-      const { loadPyodide } = await import(
-        /* @vite-ignore */
-        'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/pyodide.mjs'
-      );
+      const moduleUrl = `${PYODIDE_BASE_URL}pyodide.mjs`;
+      const { loadPyodide } = (await import(/* @vite-ignore */ moduleUrl)) as PyodideModule;
       this.pyodide = await loadPyodide({
-        indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.27.0/full/',
+        indexURL: PYODIDE_BASE_URL,
       });
       this._ready = true;
       console.log('[Pyodide] Ready');
@@ -109,23 +125,23 @@ class PyodideManager {
       // Run with timeout using Promise.race
       const result = await Promise.race([
         this.pyodide.runPythonAsync(instrumented),
-        new Promise((_, reject) =>
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Execution timed out (possible infinite loop)')), timeoutMs)
         ),
       ]);
 
       // Convert Pyodide proxy to JS
-      const events: PyTraceEvent[] = result.toJs({ dict_converter: Object.fromEntries });
+      const events = result.toJs({ dict_converter: Object.fromEntries }) as PyTraceEvent[];
 
       return {
         success: true,
         events,
         output: '',
       };
-    } catch (err: any) {
+    } catch (err) {
       return {
         success: false,
-        error: err.message || 'Unknown execution error',
+        error: (err instanceof Error && err.message) || 'Unknown execution error',
       };
     }
   }
@@ -136,9 +152,6 @@ class PyodideManager {
 // =============================================================================
 
 function buildTracerCode(userCode: string, callExpression: string): string {
-  // Indent user code to be inside the exec scope
-  const indented = userCode.split('\n').map(line => '    ' + line).join('\n');
-
   return `
 import sys
 import json

@@ -23,9 +23,7 @@ export function* bfs(root: TreeNodeData): Generator<SimEvent> {
   yield { type: 'tree.enqueue', nodeId: root.id, value: root.value };
   yield { type: 'phase.end', name: 'init' };
 
-  let step = 0;
   while (queue.length > 0) {
-    step++;
     const node = queue.shift()!;
 
     yield { type: 'phase.start', name: `visit_${node.id}`,

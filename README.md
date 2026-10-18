@@ -4,7 +4,7 @@ A visual learning platform for data structures and algorithms. Type a concept, s
 
 An LLM acts as the **teacher**. It picks the algorithm, chooses example data that teaches well, and writes the explanations. Deterministic TypeScript **simulators** are the engine. They produce every animation frame, so what you see is always what the algorithm actually does.
 
-> **Status: work in progress.** `npm run dev` works, but `npm run build` currently fails at its `tsc -b` step (53 type errors), and lint reports 31 errors. Fixing this is Milestone 1 of the [fix plan](docs/fix-plan/00-index.md). See the [audit](docs/audit/00-summary.md) for the full picture.
+> **Status: work in progress.** The build, typecheck, lint and tests are green as of Milestone 1. Milestones 2–5 of the [fix plan](docs/fix-plan/00-index.md) harden validation and fix lesson bugs. See the [audit](docs/audit/00-summary.md) for the full picture.
 
 ---
 
@@ -102,11 +102,12 @@ The frontend calls `http://localhost:3001`, which is hardcoded in `src/api/teach
 |---|---|---|
 | `npm run dev` | Vite dev server | works |
 | `npm run backend` | Express API via `tsx backend/server.ts` | works (needs `.env`) |
-| `npm run build` | `tsc -b && vite build` | ❌ fails at `tsc -b` |
-| `npm run lint` | ESLint | ❌ 31 errors |
-| `npm run preview` | Serve the production build | needs a successful build |
-| `npx tsx src/simulator/test.ts` | Simulator and template checks | ✅ 62/62 pass |
-| `npx tsx src/engine/engine.test.ts` | Legacy v1 engine checks | ✅ pass |
+| `npm run build` | `tsc -b && vite build` | ✅ |
+| `npm run typecheck` | `tsc -b` (app, Vite config and tests) | ✅ |
+| `npm run typecheck:backend` | `tsc -p backend/tsconfig.json` | ✅ |
+| `npm run lint` | ESLint | ✅ |
+| `npm test` | Vitest (`src/**/*.test.ts`) | ✅ 62 tests |
+| `npm run preview` | Serve the production build | works after `build` |
 
 ---
 
@@ -114,21 +115,21 @@ The frontend calls `http://localhost:3001`, which is hardcoded in `src/api/teach
 
 ```
 backend/
-  server.ts              Express app: /api/health, /api/teach (live), /api/generate (legacy v1)
+  server.ts              Express app: /api/health, /api/teach
   prompts/teacher.ts     LLM "teacher" prompt → LessonPlan
   providers/             AIProvider interface + Anthropic / OpenAI implementations
-  prompt.ts, validator.ts  legacy v1 (LLM-authored animation IR)
 src/
   App.tsx                the whole live UI: input, loading, lesson view, code panel
   api/teach.ts           client for /api/teach
+  router/types.ts        LessonPlan, VisualTemplate, SimulatorId and example-data types
   router/classify.ts     "is this code?" heuristic
   simulator/             deterministic algorithm generators → SimEvent
   templates/             SimEvent[] → AnimationFrame[] mappers, one per visual template
-  engine/                playback reducer + useAnimationPlayer hook (engine.ts is legacy v1)
+  engine/                playback reducer + useAnimationPlayer hook
   renderer/v2/           SVG scenes: Sorting, Tree, LinkedList, Stack (+ Bar, Node, Arrow, …)
   sandbox/               Pyodide tracer draft (not wired)
   lib/syntaxHighlighter.ts
-  components/, renderer/*.tsx, ir/   legacy v1 UI and renderer (unused; slated for removal)
+  components/            ErrorBoundary (to be mounted in Milestone 2)
 docs/
   audit/                 codebase audit (2026-10-18)
   fix-plan/              milestone-based session prompts to fix it
@@ -143,13 +144,12 @@ docs/
 3. **Mapper.** Handle the new events in the matching `src/templates/*.ts` mapper. A new visual template needs a new mapper plus a case in `src/templates/registry.ts`.
 4. **Scene.** For a new template, add a scene in `src/renderer/v2/` and a case in `renderer/v2/SceneRenderer.tsx`.
 5. **Teach the teacher.** Add the simulator id and data shape to the table in `backend/prompts/teacher.ts`.
-6. **Test.** Add checks to `src/simulator/test.ts`; this moves to Vitest in Milestone 1.
+6. **Test.** Add Vitest specs next to the code (`src/simulator/simulators.test.ts`, `src/templates/templates.test.ts`), and run `npm test`.
 
 ---
 
 ## Known limitations
 
-- Typecheck and lint are red. The dev server runs because the broken imports are type-only.
 - The LLM's lesson plan is barely validated, and no error boundary is mounted, so an unusual plan can blank the screen.
 - The backend has no rate limit or input cap. Keep it on localhost.
 - Canvases are a fixed 700 px wide, so large inputs overflow.
@@ -162,7 +162,7 @@ Every item is tracked, with file and line references, in [docs/audit/04-issues-a
 
 The fix plan has five milestones, each run as self-contained Claude Code session prompts. See [docs/fix-plan/00-index.md](docs/fix-plan/00-index.md).
 
-1. **Stable foundation:** commit the baseline, remove legacy code, get the build green, adopt Vitest.
+1. ✅ **Stable foundation:** commit the baseline, remove legacy code, get the build green, adopt Vitest.
 2. **Trustworthy pipeline:** zod-validated lesson plans, error boundaries, rate limiting, Anthropic as the default provider.
 3. **Correct lessons:** fix the simulator and mapper bugs, ship canonical code with exact line maps, auto-fit the canvases.
 4. **Second execution path:** Pyodide in a killable Web Worker, a trace template, pasted Python animated through the same renderer.

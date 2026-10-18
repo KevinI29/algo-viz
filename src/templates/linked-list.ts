@@ -216,8 +216,8 @@ export function mapLinkedListEvents(
 
       case 'example.start': {
         // Reset for new example
-        const newData = event.data as any;
-        if (newData?.values) {
+        const newData = event.data;
+        if (newData.type === 'linked_list') {
           const newVals: number[] = newData.values;
           // Clear old
           for (const k of Object.keys(nodes)) delete nodes[k];

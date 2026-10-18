@@ -12,6 +12,8 @@
  * - The template mapper consumes these and produces AnimationFrames.
  */
 
+import type { ExampleData } from '../router/types';
+
 // =============================================================================
 // SORTING EVENTS
 // =============================================================================
@@ -201,7 +203,7 @@ export type PhaseEnd = {
 export type ExampleStart = {
   type: 'example.start';
   label: string;               // "Example 1: Odd-length list"
-  data: unknown;               // the input data for this example
+  data: ExampleData;           // the input data for this example
 };
 
 export type ExampleEnd = {

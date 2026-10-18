@@ -7,7 +7,7 @@
  */
 
 import { useReducer, useRef, useEffect, useCallback } from 'react';
-import type { AnimationTimeline } from '../../templates/types';
+import type { AnimationTimeline } from '../templates/types';
 import {
   playerReducer,
   INITIAL_PLAYER_STATE,

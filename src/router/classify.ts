@@ -20,8 +20,8 @@ export function looksLikeCode(input: string): boolean {
   const codePatterns = [
     /\b(def|function|class|const|let|var)\s+\w+/,    // function/variable definitions
     /\bfor\s+\w+\s+in\b/,                             // Python for loop
-    /\bwhile\s*[\(:]/ ,                                // while loop
-    /\b(if|elif|else)\s*[\(:]/,                        // conditionals
+    /\bwhile\s*[(:]/ ,                                 // while loop
+    /\b(if|elif|else)\s*[(:]/,                         // conditionals
     /\w+\s*=\s*\[/,                                    // array assignment
     /\breturn\s+/,                                     // return statement
     /\bimport\s+/,                                     // import

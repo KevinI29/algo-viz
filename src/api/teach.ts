@@ -51,7 +51,7 @@ export async function fetchLessonPlan(
 
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {
-      if (signal?.aborted) return { ok: false, aborted: true } as any;
+      if (signal?.aborted) return { ok: false, aborted: true };
       return { ok: false, error: 'Request timed out — AI took too long' };
     }
     return { ok: false, error: err instanceof Error ? err.message : 'Network error' };
