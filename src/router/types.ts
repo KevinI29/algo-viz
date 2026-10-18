@@ -84,7 +84,7 @@ export type LessonPlan = {
   concept: string;
   category: LessonCategory;
   textOnly?: boolean;
-  exampleData: ExampleData;
+  exampleData?: ExampleData;          // required when simulator is set (enforced by src/lesson/schema.ts)
   additionalExamples?: LessonExample[];
   code?: {
     source: string;

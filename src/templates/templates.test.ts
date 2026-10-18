@@ -29,7 +29,7 @@ function plan(overrides: Partial<LessonPlan> & Pick<LessonPlan, 'simulator' | 'v
 }
 
 function timelineFor(p: LessonPlan) {
-  const events = runSimulator(p.simulator!, p.exampleData);
+  const events = runSimulator(p.simulator!, p.exampleData!);
   expect(events).not.toBeNull();
   return compileTimeline(p, events!);
 }
@@ -127,5 +127,38 @@ describe('runLessonPlan + compileTimeline', () => {
     const timeline = compileTimeline(fullPlan, events!);
     expect(timeline.frames.length).toBeGreaterThan(20);
     expect(timeline.meta.estimatedDuration).toBeGreaterThan(5000);
+  });
+});
+
+// =============================================================================
+// ROBUSTNESS
+// =============================================================================
+
+describe('runLessonPlan robustness', () => {
+  it('skips a failing additional example without orphan markers', () => {
+    const events = runLessonPlan(plan({
+      simulator: 'sorting.bubble',
+      visualTemplate: 'sorting',
+      exampleData: { type: 'sorting', array: [2, 1] },
+      additionalExamples: [
+        // Wrong data type for the simulator — runSimulator returns null
+        { label: 'Broken', data: { type: 'stack', input: '()' } },
+        { label: 'Good', data: { type: 'sorting', array: [3, 1, 2] } },
+      ],
+    }));
+    expect(events).not.toBeNull();
+    const starts = events!.filter(e => e.type === 'example.start');
+    const ends = events!.filter(e => e.type === 'example.end');
+    expect(starts.map(e => e.type === 'example.start' && e.label)).toEqual(['Example 1', 'Good']);
+    expect(ends).toHaveLength(starts.length);
+  });
+
+  it('returns null for a simulator plan without example data', () => {
+    expect(runLessonPlan(plan({ simulator: 'sorting.bubble', visualTemplate: 'sorting', exampleData: undefined }))).toBeNull();
+  });
+
+  it('compiles an empty timeline for a plan with no data', () => {
+    const t = compileTimeline(plan({ simulator: null, visualTemplate: 'sorting', exampleData: undefined }), []);
+    expect(t.frames).toEqual([]);
   });
 });

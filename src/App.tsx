@@ -88,14 +88,23 @@ export default function App() {
 
     // Has simulator? Run it
     if (plan.simulator) {
-      const events = runLessonPlan(plan)
-      if (!events) {
-        setAppState({ status: 'error', message: `Simulator "${plan.simulator}" failed to run` })
-        return
+      try {
+        const events = runLessonPlan(plan)
+        if (!events) {
+          setAppState({ status: 'error', message: `Couldn't run the "${plan.concept}" simulation. Please try again.` })
+          return
+        }
+        const timeline = compileTimeline(plan, events)
+        if (timeline.frames.length === 0) {
+          setAppState({ status: 'error', message: `Couldn't build an animation for "${plan.concept}". Please try again.` })
+          return
+        }
+        player.load(timeline)
+        setAppState({ status: 'animation', plan, timeline })
+      } catch (err) {
+        console.error('[App] Failed to build animation:', err)
+        setAppState({ status: 'error', message: `Something went wrong animating "${plan.concept}". Please try again.` })
       }
-      const timeline = compileTimeline(plan, events)
-      player.load(timeline)
-      setAppState({ status: 'animation', plan, timeline })
       return
     }
 

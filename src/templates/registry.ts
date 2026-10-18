@@ -6,7 +6,7 @@
  */
 
 import type { SimEvent } from '../simulator/events';
-import type { LessonPlan, SortingData, TreeData, LinkedListData, StackData } from '../router/types';
+import type { LessonPlan } from '../router/types';
 import type { AnimationFrame, AnimationTimeline } from './types';
 import { mapSortingEvents } from './sorting';
 import { mapTreeEvents } from './tree';
@@ -49,33 +49,29 @@ export function compileTimeline(
 // =============================================================================
 
 function mapEvents(plan: LessonPlan, events: SimEvent[]): AnimationFrame[] {
-  switch (plan.visualTemplate) {
+  // Each data type has exactly one template, so dispatch on the (validated)
+  // example data rather than trusting plan.visualTemplate.
+  const data = plan.exampleData;
+  switch (data?.type) {
     case 'sorting': {
-      const data = plan.exampleData as SortingData;
       // Derive staging label from simulator — insertion sort uses "key", others use "temp"
       const stagingLabel = plan.simulator?.includes('insertion') ? 'key' : 'temp';
       return mapSortingEvents(events, data.array, plan.phaseExplanations, stagingLabel);
     }
 
-    case 'tree': {
-      const data = plan.exampleData as TreeData;
+    case 'tree':
       return mapTreeEvents(events, data.root, plan.phaseExplanations);
-    }
 
-    case 'linked_list': {
-      const data = plan.exampleData as LinkedListData;
+    case 'linked_list':
       return mapLinkedListEvents(
         events, data.values, data.pointers, plan.phaseExplanations,
       );
-    }
 
-    case 'stack': {
-      const data = plan.exampleData as StackData;
+    case 'stack':
       return mapStackEvents(events, data.input, plan.phaseExplanations);
-    }
 
     default:
-      console.warn(`[Template] Unknown visual template: ${plan.visualTemplate}`);
+      console.warn(`[Template] No template for plan "${plan.concept}" (template ${plan.visualTemplate})`);
       return [];
   }
 }

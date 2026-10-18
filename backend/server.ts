@@ -15,22 +15,10 @@ import dotenv from 'dotenv';
 import { OpenAIProvider }    from './providers/openai';
 import { AnthropicProvider } from './providers/anthropic';
 import type { AIProvider }   from './providers/types';
-import { buildTeachPrompt } from './prompts/teacher';
+import { generateLessonPlan } from './teach';
 import path from 'path';
 
 dotenv.config({ path: path.resolve(process.cwd(), '.env') });
-
-// =============================================================================
-// JSON EXTRACTION
-// LLMs sometimes wrap JSON in markdown code blocks — strip them before parsing.
-// =============================================================================
-
-function extractJSON(text: string): string {
-  const trimmed = text.trim();
-  // Strip ```json ... ``` or ``` ... ``` wrappers
-  const match = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
-  return match ? match[1].trim() : trimmed;
-}
 
 // =============================================================================
 // PROVIDER FACTORY
@@ -114,62 +102,30 @@ app.get('/api/health', (_req, res) => {
  * 3. Display code and explanations
  */
 app.post('/api/teach', async (req, res) => {
-  const { userInput, inputType } = req.body;
-
-  if (!userInput || typeof userInput !== 'string' || !userInput.trim()) {
-    return res.status(400).json({ error: 'userInput is required' });
-  }
-
-  const cleanInput = userInput.trim();
-  const type = inputType === 'code' ? 'code' : 'concept';
-  console.log(`\n[Teach] Input: "${cleanInput.slice(0, 80)}..." (${type})`);
-
   try {
-    const { system, user } = buildTeachPrompt(cleanInput, type);
+    const { userInput, inputType } = (req.body ?? {}) as { userInput?: unknown; inputType?: unknown };
 
-    const response = await provider.complete([
-      { role: 'system', content: system },
-      { role: 'user', content: user },
-    ]);
-
-    // Parse JSON
-    let lessonPlan: unknown;
-    try {
-      lessonPlan = JSON.parse(extractJSON(response.text));
-    } catch {
-      console.error('[Teach] Failed to parse LLM response as JSON');
-      console.error('[Teach] Raw:', response.text.slice(0, 500));
-
-      // Retry once
-      console.log('[Teach] Retrying...');
-      const retryResponse = await provider.complete([
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-        { role: 'assistant', content: response.text },
-        { role: 'user', content: 'Your response was not valid JSON. Return ONLY the raw JSON object. Start with { and end with }. No markdown wrapping.' },
-      ]);
-
-      try {
-        lessonPlan = JSON.parse(extractJSON(retryResponse.text));
-      } catch {
-        return res.status(500).json({ error: 'AI failed to produce valid JSON after retry' });
-      }
+    if (!userInput || typeof userInput !== 'string' || !userInput.trim()) {
+      return res.status(400).json({ error: 'userInput is required' });
     }
 
-    // Basic validation (full schema validation arrives in M2)
-    const plan = (lessonPlan ?? {}) as Record<string, unknown>;
-    if (!plan.concept || !plan.visualTemplate) {
-      return res.status(500).json({ error: 'AI returned incomplete lesson plan' });
+    const cleanInput = userInput.trim();
+    const type = inputType === 'code' ? 'code' : 'concept';
+    console.log(`
+[Teach] Input: "${cleanInput.slice(0, 80)}..." (${type})`);
+
+    const result = await generateLessonPlan(provider, cleanInput, type);
+    if (!result.ok) {
+      return res.status(502).json({ error: 'The AI returned an invalid lesson plan. Please try again.' });
     }
 
-    console.log(`[Teach] ✅ Lesson plan: ${plan.concept} | simulator=${plan.simulator} | template=${plan.visualTemplate}`);
+    const { plan } = result;
+    console.log(`[Teach] ✅ Lesson plan: ${plan.concept} | simulator=${plan.simulator} | template=${plan.visualTemplate} | attempts=${result.attempts}`);
     return res.json(plan);
 
   } catch (err) {
     console.error('[Teach] Error:', err);
-    return res.status(500).json({
-      error: err instanceof Error ? err.message : 'Unknown error',
-    });
+    return res.status(500).json({ error: 'Something went wrong generating the lesson. Please try again.' });
   }
 });
 

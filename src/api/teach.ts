@@ -5,6 +5,7 @@
  */
 
 import type { LessonPlan } from '../router/types';
+import { parseLessonPlan } from '../lesson/schema';
 
 const BACKEND_URL = 'http://localhost:3001';
 const TIMEOUT_MS = 45_000;
@@ -46,8 +47,13 @@ export async function fetchLessonPlan(
       return { ok: false, error: body.error ?? `Server error ${res.status}` };
     }
 
-    const plan: LessonPlan = await res.json();
-    return { ok: true, plan };
+    const raw: unknown = await res.json().catch(() => null);
+    const parsed = parseLessonPlan(raw);
+    if (!parsed.ok) {
+      console.warn('[Teach] Rejected lesson plan from server:', parsed.error);
+      return { ok: false, error: 'Received an invalid lesson plan. Please try again.' };
+    }
+    return { ok: true, plan: parsed.plan };
 
   } catch (err) {
     if (err instanceof DOMException && err.name === 'AbortError') {

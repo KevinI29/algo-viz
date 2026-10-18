@@ -79,6 +79,8 @@ export function playerReducer(state: PlayerState, action: PlayerAction): PlayerS
     }
 
     case 'play':
+      // Nothing to play — don't enter 'playing' with no frame timer to drive it
+      if (!state.timeline || state.totalFrames === 0) return state;
       if (state.mode === 'finished') {
         // Replay from start
         return {
@@ -98,10 +100,7 @@ export function playerReducer(state: PlayerState, action: PlayerAction): PlayerS
 
     case 'toggle_play':
       if (state.mode === 'playing') return { ...state, mode: 'paused' };
-      if (state.mode === 'finished') {
-        return playerReducer(state, { type: 'play' });
-      }
-      return { ...state, mode: 'playing' };
+      return playerReducer(state, { type: 'play' });
 
     case 'next_frame': {
       if (!state.timeline) return state;
